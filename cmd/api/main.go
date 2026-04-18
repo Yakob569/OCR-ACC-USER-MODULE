@@ -10,7 +10,6 @@ import (
 	"github.com/cashflow/auth-service/internal/adapters/repositories"
 	"github.com/cashflow/auth-service/internal/config"
 	"github.com/cashflow/auth-service/internal/core/services"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func main() {
@@ -20,27 +19,19 @@ func main() {
 		log.Fatal("DATABASE_URL must be set")
 	}
 
-	// 1. Initialize DB Pool
+	// 1. Initialize Database
 	ctx := context.Background()
-	dbPool, err := pgxpool.New(ctx, cfg.DatabaseURL)
-	if err != nil {
-		log.Fatalf("Unable to connect to database: %v", err)
-	}
-	defer dbPool.Close()
-
-	if err := dbPool.Ping(ctx); err != nil {
-		log.Fatalf("Database ping failed: %v", err)
-	}
-	log.Println("✅ Successfully connected to PostgreSQL")
+	dbManager := repositories.NewDatabaseManager(ctx, cfg.DatabaseURL)
+	defer dbManager.Close()
 
 	// 2. Wire Hexagonal Architecture
 	authAdapter := auth.NewSupabaseAuthAdapter(cfg.SupabaseURL, cfg.SupabaseKey)
-	userRepo := repositories.NewUserRepository(dbPool)
+	userRepo := repositories.NewUserRepository(dbManager.Pool)
 	userSvc := services.NewUserService(userRepo, authAdapter)
 	userHandler := handlers.NewUserHandler(userSvc)
 
 	// 3. Initialize and Start Server
-	server := api.NewServer(cfg.Port, userHandler, dbPool)
+	server := api.NewServer(cfg.Port, userHandler, dbManager.Pool)
 	
 	if err := server.Start(); err != nil {
 		log.Fatal(err)

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -13,6 +14,7 @@ type Server struct {
 	port        string
 	userHandler *handlers.UserHandler
 	db          *pgxpool.Pool
+	httpServer  *http.Server
 }
 
 func NewServer(port string, userHandler *handlers.UserHandler, db *pgxpool.Pool) *Server {
@@ -26,8 +28,18 @@ func NewServer(port string, userHandler *handlers.UserHandler, db *pgxpool.Pool)
 func (s *Server) Start() error {
 	handler := s.RegisterRoutes()
 
+	s.httpServer = &http.Server{
+		Addr:    ":" + s.port,
+		Handler: handler,
+	}
+
 	log.Printf("🚀 Auth Service running on :%s (Hexagonal Architecture)", s.port)
-	return http.ListenAndServe(":"+s.port, handler)
+	return s.httpServer.ListenAndServe()
+}
+
+func (s *Server) Shutdown(ctx context.Context) error {
+	log.Println("Stopping HTTP server...")
+	return s.httpServer.Shutdown(ctx)
 }
 
 func (s *Server) healthCheck(w http.ResponseWriter, r *http.Request) {

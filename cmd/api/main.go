@@ -5,6 +5,7 @@ import (
 	"log"
 
 	"github.com/cashflow/auth-service/internal/adapters/api"
+	"github.com/cashflow/auth-service/internal/adapters/auth"
 	"github.com/cashflow/auth-service/internal/adapters/handlers"
 	"github.com/cashflow/auth-service/internal/adapters/repositories"
 	"github.com/cashflow/auth-service/internal/config"
@@ -33,8 +34,9 @@ func main() {
 	log.Println("✅ Successfully connected to PostgreSQL")
 
 	// 2. Wire Hexagonal Architecture
+	authAdapter := auth.NewSupabaseAuthAdapter(cfg.SupabaseURL, cfg.SupabaseKey)
 	userRepo := repositories.NewUserRepository(dbPool)
-	userSvc := services.NewUserService(userRepo)
+	userSvc := services.NewUserService(userRepo, authAdapter)
 	userHandler := handlers.NewUserHandler(userSvc)
 
 	// 3. Initialize and Start Server

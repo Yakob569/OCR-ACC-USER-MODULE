@@ -24,14 +24,10 @@ func NewServer(port string, userHandler *handlers.UserHandler, db *pgxpool.Pool)
 }
 
 func (s *Server) Start() error {
-	mux := http.NewServeMux()
-
-	// Register Routes
-	mux.HandleFunc("/health", s.healthCheck)
-	mux.HandleFunc("/api/v1/register", s.userHandler.Register)
+	handler := s.RegisterRoutes()
 
 	log.Printf("🚀 Auth Service running on :%s (Hexagonal Architecture)", s.port)
-	return http.ListenAndServe(":"+s.port, mux)
+	return http.ListenAndServe(":"+s.port, handler)
 }
 
 func (s *Server) healthCheck(w http.ResponseWriter, r *http.Request) {

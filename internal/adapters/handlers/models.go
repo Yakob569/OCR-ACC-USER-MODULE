@@ -16,18 +16,27 @@ type ForgotPasswordRequest struct {
 	Email string `json:"email"`
 }
 
+type RegisterResponse struct {
+	Status bool        `json:"status"`
+	Data   interface{} `json:"data"` // Using interface{} to allow domain.User without direct import loop if possible, or just use any
+}
+
 type TokenResponse struct {
+	Status      bool   `json:"status"`
 	AccessToken string `json:"access_token"`
 }
 
 type SocialLoginResponse struct {
+	Status           bool   `json:"status"`
 	AuthorizationURL string `json:"authorization_url"`
 }
 
 type ErrorResponse struct {
-	Error string `json:"error"`
+	Status bool   `json:"status"`
+	Error  string `json:"error"`
 }
 
 type MessageResponse struct {
+	Status  bool   `json:"status"`
 	Message string `json:"message"`
 }

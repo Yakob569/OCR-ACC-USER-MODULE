@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/cashflow/auth-service/internal/core/ports"
 )
@@ -16,16 +17,37 @@ func NewUserHandler(svc ports.UserService) *UserHandler {
 	return &UserHandler{svc: svc}
 }
 
+// mapError converts internal errors to user-friendly ones if they are safe to disclose
+func (h *UserHandler) mapError(err error) string {
+	errStr := err.Error()
+
+	// Check for Supabase specific validation errors
+	if strings.Contains(errStr, "email_address_invalid") || strings.Contains(errStr, "invalid email") {
+		return "The email address provided is invalid."
+	}
+	if strings.Contains(errStr, "already registered") || strings.Contains(errStr, "already exists") {
+		return "This email is already registered."
+	}
+	if strings.Contains(errStr, "password is too short") {
+		return "Password must be at least 6 characters long."
+	}
+
+	// Default generic message for safety
+	return "Internal server error. Please try again later."
+}
+
 func (h *UserHandler) Register(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
 	if r.Method != http.MethodPost {
-		http.Error(w, `{"error":"Only POST is allowed"}`, http.StatusMethodNotAllowed)
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: "Only POST is allowed"})
 		return
 	}
 
 	var body RegisterRequest
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(ErrorResponse{Error: "Invalid request body"})
+		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: "Invalid request body"})
 		return
 	}
 
@@ -33,25 +55,26 @@ func (h *UserHandler) Register(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Printf("[Handler] Register Error: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(ErrorResponse{Error: "Registration failed. Please try again later."})
+		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: h.mapError(err)})
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(user)
+	json.NewEncoder(w).Encode(RegisterResponse{Status: true, Data: user})
 }
 
 func (h *UserHandler) Login(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
 	if r.Method != http.MethodPost {
-		http.Error(w, `{"error":"Only POST is allowed"}`, http.StatusMethodNotAllowed)
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: "Only POST is allowed"})
 		return
 	}
 
 	var body LoginRequest
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(ErrorResponse{Error: "Invalid request body"})
+		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: "Invalid request body"})
 		return
 	}
 
@@ -59,24 +82,25 @@ func (h *UserHandler) Login(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Printf("[Handler] Login Error: %v", err)
 		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(ErrorResponse{Error: "Invalid email or password"})
+		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: "Invalid email or password"})
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(TokenResponse{AccessToken: token})
+	json.NewEncoder(w).Encode(TokenResponse{Status: true, AccessToken: token})
 }
 
 func (h *UserHandler) ForgotPassword(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
 	if r.Method != http.MethodPost {
-		http.Error(w, `{"error":"Only POST is allowed"}`, http.StatusMethodNotAllowed)
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: "Only POST is allowed"})
 		return
 	}
 
 	var body ForgotPasswordRequest
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(ErrorResponse{Error: "Invalid request body"})
+		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: "Invalid request body"})
 		return
 	}
 
@@ -84,18 +108,19 @@ func (h *UserHandler) ForgotPassword(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Printf("[Handler] ForgotPassword Error: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(ErrorResponse{Error: "Failed to process request. Please try again later."})
+		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: h.mapError(err)})
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(MessageResponse{Message: "Password reset instructions sent to email"})
+	json.NewEncoder(w).Encode(MessageResponse{Status: true, Message: "Password reset instructions sent to email"})
 }
 
 func (h *UserHandler) SocialLogin(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
 	provider := r.URL.Query().Get("provider")
 	if provider == "" {
-		http.Error(w, `{"error":"provider query parameter is required"}`, http.StatusBadRequest)
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: "provider query parameter is required"})
 		return
 	}
 
@@ -103,10 +128,9 @@ func (h *UserHandler) SocialLogin(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Printf("[Handler] SocialLogin Error: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(ErrorResponse{Error: "Failed to generate authorization URL"})
+		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: "Failed to generate authorization URL"})
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(SocialLoginResponse{AuthorizationURL: url})
+	json.NewEncoder(w).Encode(SocialLoginResponse{Status: true, AuthorizationURL: url})
 }

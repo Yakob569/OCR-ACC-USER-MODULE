@@ -31,6 +31,9 @@ func (h *UserHandler) mapError(err error) string {
 	if strings.Contains(errStr, "password is too short") {
 		return "Password must be at least 6 characters long."
 	}
+	if strings.Contains(errStr, "over_email_send_rate_limit") || strings.Contains(errStr, "rate limit exceeded") {
+		return "Too many requests. Please try again in an hour."
+	}
 
 	// Default generic message for safety
 	return "Internal server error. Please try again later."

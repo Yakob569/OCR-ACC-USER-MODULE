@@ -9,7 +9,11 @@ import (
 )
 
 type Config struct {
-	DatabaseURL string
+	DBUser      string
+	DBPass      string
+	DBHost      string
+	DBPort      string
+	DBName      string
 	Port        string
 	SupabaseURL string
 	SupabaseKey string
@@ -21,14 +25,18 @@ func LoadConfig() (*Config, error) {
 	}
 
 	cfg := &Config{
-		DatabaseURL: getEnv("DATABASE_URL", ""),
+		DBUser:      getEnv("DB_USER", ""),
+		DBPass:      getEnv("DB_PASS", ""),
+		DBHost:      getEnv("DB_HOST", "localhost"),
+		DBPort:      getEnv("DB_PORT", "5432"),
+		DBName:      getEnv("DB_NAME", "postgres"),
 		Port:        getEnv("PORT", "8080"),
 		SupabaseURL: getEnv("SUPABASE_URL", ""),
 		SupabaseKey: getEnv("SUPABASE_KEY", ""),
 	}
 
-	if cfg.DatabaseURL == "" {
-		return nil, fmt.Errorf("DATABASE_URL is a required environment variable")
+	if cfg.DBPass == "" {
+		return nil, fmt.Errorf("DB_PASS is a required environment variable")
 	}
 
 	return cfg, nil

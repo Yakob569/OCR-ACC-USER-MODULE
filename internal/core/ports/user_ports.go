@@ -25,7 +25,7 @@ type AuthService interface {
 
 // UserService defines the business logic contract for authentication/users
 type UserService interface {
-	Register(ctx context.Context, email, password, fullName, phone, role string) (*domain.User, error)
+	Register(ctx context.Context, email, password, fullName, phone string) (*domain.User, error)
 	Login(ctx context.Context, email, password string) (string, error)
 	ResetPassword(ctx context.Context, email string) error
 	GetSocialLoginURL(provider string) (string, error)

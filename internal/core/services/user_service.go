@@ -21,7 +21,7 @@ func NewUserService(repo ports.UserRepository, auth ports.AuthService) ports.Use
 	}
 }
 
-func (s *userService) Register(ctx context.Context, email, password, fullName, phone, role string) (*domain.User, error) {
+func (s *userService) Register(ctx context.Context, email, password, fullName, phone string) (*domain.User, error) {
 	// 1. Create in Supabase Auth
 	_, err := s.auth.SignUp(ctx, email, password)
 	if err != nil {
@@ -39,7 +39,7 @@ func (s *userService) Register(ctx context.Context, email, password, fullName, p
 		Email:        email,
 		FullName:     fullName,
 		Phone:        &phone,
-		Role:         role,
+		Role:         "user",
 		AuthProvider: "email",
 	}
 

@@ -28,7 +28,7 @@ func (h *UserHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := h.svc.Register(r.Context(), body.Email, body.Password, body.FullName, body.Phone, body.Role)
+	user, err := h.svc.Register(r.Context(), body.Email, body.Password, body.FullName, body.Phone)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(ErrorResponse{Error: err.Error()})

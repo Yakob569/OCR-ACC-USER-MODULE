@@ -43,7 +43,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"email\": \"test@example.com\",\n    \"password\": \"password123\",\n    \"full_name\": \"John Doe\",\n    \"phone\": \"+251911223344\",\n    \"role\": \"user\"\n}"
+							"raw": "{\n    \"email\": \"test@example.com\",\n    \"password\": \"password123\",\n    \"full_name\": \"John Doe\",\n    \"phone\": \"+251911223344\"\n}"
 						},
 						"url": {
 							"raw": "{{base_url}}/api/v1/register",

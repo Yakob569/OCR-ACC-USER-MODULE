@@ -5,7 +5,6 @@ type RegisterRequest struct {
 	Password string `json:"password"`
 	FullName string `json:"full_name"`
 	Phone    string `json:"phone"`
-	Role     string `json:"role"`
 }
 
 type LoginRequest struct {

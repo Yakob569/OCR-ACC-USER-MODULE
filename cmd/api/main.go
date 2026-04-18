@@ -18,10 +18,9 @@ import (
 )
 
 func main() {
-	cfg := config.LoadConfig()
-
-	if cfg.DatabaseURL == "" {
-		log.Fatal("DATABASE_URL must be set")
+	cfg, err := config.LoadConfig()
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	// 1. Initialize Database

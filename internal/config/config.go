@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"log"
 	"os"
 
@@ -14,17 +15,23 @@ type Config struct {
 	SupabaseKey string
 }
 
-func LoadConfig() *Config {
+func LoadConfig() (*Config, error) {
 	if err := godotenv.Load(); err != nil {
 		log.Println("No .env file found, reading from environment variables")
 	}
 
-	return &Config{
+	cfg := &Config{
 		DatabaseURL: getEnv("DATABASE_URL", ""),
 		Port:        getEnv("PORT", "8080"),
 		SupabaseURL: getEnv("SUPABASE_URL", ""),
 		SupabaseKey: getEnv("SUPABASE_KEY", ""),
 	}
+
+	if cfg.DatabaseURL == "" {
+		return nil, fmt.Errorf("DATABASE_URL is a required environment variable")
+	}
+
+	return cfg, nil
 }
 
 func getEnv(key, fallback string) string {

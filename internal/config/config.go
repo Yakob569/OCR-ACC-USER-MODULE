@@ -15,8 +15,9 @@ type Config struct {
 	DBPort      string
 	DBName      string
 	Port        string
-	SupabaseURL string
-	SupabaseKey string
+	SupabaseURL        string
+	SupabaseKey        string
+	SupabaseProjectRef string
 }
 
 func LoadConfig() (*Config, error) {
@@ -25,14 +26,15 @@ func LoadConfig() (*Config, error) {
 	}
 
 	cfg := &Config{
-		DBUser:      getEnv("DB_USER", ""),
-		DBPass:      getEnv("DB_PASS", ""),
-		DBHost:      getEnv("DB_HOST", "localhost"),
-		DBPort:      getEnv("DB_PORT", "5432"),
-		DBName:      getEnv("DB_NAME", "postgres"),
-		Port:        getEnv("PORT", "8080"),
-		SupabaseURL: getEnv("SUPABASE_URL", ""),
-		SupabaseKey: getEnv("SUPABASE_KEY", ""),
+		DBUser:             getEnv("DB_USER", ""),
+		DBPass:             getEnv("DB_PASS", ""),
+		DBHost:             getEnv("DB_HOST", "localhost"),
+		DBPort:             getEnv("DB_PORT", "5432"),
+		DBName:             getEnv("DB_NAME", "postgres"),
+		Port:               getEnv("PORT", "8080"),
+		SupabaseURL:        getEnv("SUPABASE_URL", ""),
+		SupabaseKey:        getEnv("SUPABASE_KEY", ""),
+		SupabaseProjectRef: getEnv("SUPABASE_PROJECT_REF", ""),
 	}
 
 	if cfg.DBPass == "" {

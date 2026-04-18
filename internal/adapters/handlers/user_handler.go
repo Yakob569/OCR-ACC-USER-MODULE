@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 
 	"github.com/cashflow/auth-service/internal/core/ports"
@@ -30,8 +31,9 @@ func (h *UserHandler) Register(w http.ResponseWriter, r *http.Request) {
 
 	user, err := h.svc.Register(r.Context(), body.Email, body.Password, body.FullName, body.Phone)
 	if err != nil {
+		log.Printf("[Handler] Register Error: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(ErrorResponse{Error: err.Error()})
+		json.NewEncoder(w).Encode(ErrorResponse{Error: "Registration failed. Please try again later."})
 		return
 	}
 
@@ -55,8 +57,9 @@ func (h *UserHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 	token, err := h.svc.Login(r.Context(), body.Email, body.Password)
 	if err != nil {
+		log.Printf("[Handler] Login Error: %v", err)
 		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(ErrorResponse{Error: "Invalid credentials"})
+		json.NewEncoder(w).Encode(ErrorResponse{Error: "Invalid email or password"})
 		return
 	}
 
@@ -79,8 +82,9 @@ func (h *UserHandler) ForgotPassword(w http.ResponseWriter, r *http.Request) {
 
 	err := h.svc.ResetPassword(r.Context(), body.Email)
 	if err != nil {
+		log.Printf("[Handler] ForgotPassword Error: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(ErrorResponse{Error: err.Error()})
+		json.NewEncoder(w).Encode(ErrorResponse{Error: "Failed to process request. Please try again later."})
 		return
 	}
 
@@ -97,8 +101,9 @@ func (h *UserHandler) SocialLogin(w http.ResponseWriter, r *http.Request) {
 
 	url, err := h.svc.GetSocialLoginURL(provider)
 	if err != nil {
+		log.Printf("[Handler] SocialLogin Error: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(ErrorResponse{Error: err.Error()})
+		json.NewEncoder(w).Encode(ErrorResponse{Error: "Failed to generate authorization URL"})
 		return
 	}
 

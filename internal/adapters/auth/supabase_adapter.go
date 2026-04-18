@@ -14,8 +14,8 @@ type supabaseAuthAdapter struct {
 	url    string
 }
 
-func NewSupabaseAuthAdapter(url, key string) ports.AuthService {
-	client := gotrue.New(url, key)
+func NewSupabaseAuthAdapter(projectRef, url, key string) ports.AuthService {
+	client := gotrue.New(projectRef, key)
 	return &supabaseAuthAdapter{
 		client: client,
 		url:    url,

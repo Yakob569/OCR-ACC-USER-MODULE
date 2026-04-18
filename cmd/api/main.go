@@ -34,7 +34,7 @@ func main() {
 	}()
 
 	// 2. Wire Hexagonal Architecture
-	authAdapter := auth.NewSupabaseAuthAdapter(cfg.SupabaseURL, cfg.SupabaseKey)
+	authAdapter := auth.NewSupabaseAuthAdapter(cfg.SupabaseProjectRef, cfg.SupabaseURL, cfg.SupabaseKey)
 	userRepo := repositories.NewUserRepository(dbManager.Pool)
 	userSvc := services.NewUserService(userRepo, authAdapter)
 	userHandler := handlers.NewUserHandler(userSvc)

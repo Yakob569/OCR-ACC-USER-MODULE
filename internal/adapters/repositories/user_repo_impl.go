@@ -3,6 +3,7 @@ package repositories
 import (
 	"context"
 	"errors"
+	"log"
 	"time"
 
 	"github.com/cashflow/auth-service/internal/core/domain"
@@ -24,6 +25,7 @@ func NewUserRepository(db *pgxpool.Pool) ports.UserRepository {
 }
 
 func (r *userRepo) CreateUser(ctx context.Context, u *domain.User) (*domain.User, error) {
+	log.Printf("[UserRepo] Executing CreateUser for email: %s", u.Email)
 	query := `
 		INSERT INTO users (email, full_name, phone, role, auth_provider, password_hash)
 		VALUES ($1, $2, $3, $4, $5, $6)
@@ -55,6 +57,7 @@ func (r *userRepo) CreateUser(ctx context.Context, u *domain.User) (*domain.User
 	)
 
 	if err != nil {
+		log.Printf("[UserRepo] CreateUser failed: %v", err)
 		return nil, err
 	}
 
@@ -65,10 +68,12 @@ func (r *userRepo) CreateUser(ctx context.Context, u *domain.User) (*domain.User
 		registered.AvatarURL = &avatar.String
 	}
 
+	log.Printf("[UserRepo] CreateUser successful, ID: %s", registered.ID)
 	return &registered, nil
 }
 
 func (r *userRepo) GetUserByEmail(ctx context.Context, email string) (*domain.User, error) {
+	log.Printf("[UserRepo] Fetching user by email: %s", email)
 	query := `
 		SELECT id, email, password_hash, full_name, phone, role, is_active, email_verified, auth_provider, avatar_url, created_at, updated_at
 		FROM users WHERE email = $1
@@ -93,6 +98,7 @@ func (r *userRepo) GetUserByEmail(ctx context.Context, email string) (*domain.Us
 	)
 
 	if err != nil {
+		log.Printf("[UserRepo] GetUserByEmail for %s error/not found: %v", email, err)
 		return nil, err
 	}
 
@@ -106,10 +112,12 @@ func (r *userRepo) GetUserByEmail(ctx context.Context, email string) (*domain.Us
 		u.AvatarURL = &avatar.String
 	}
 
+	log.Printf("[UserRepo] Found user: %s (ID: %s)", email, u.ID)
 	return &u, nil
 }
 
 func (r *userRepo) GetUserByID(ctx context.Context, id uuid.UUID) (*domain.User, error) {
+	log.Printf("[UserRepo] Fetching user by ID: %s", id)
 	query := `
 		SELECT id, email, full_name, phone, role, is_active, email_verified, auth_provider, avatar_url, created_at, updated_at
 		FROM users WHERE id = $1
@@ -133,6 +141,7 @@ func (r *userRepo) GetUserByID(ctx context.Context, id uuid.UUID) (*domain.User,
 	)
 
 	if err != nil {
+		log.Printf("[UserRepo] GetUserByID failed for %s: %v", id, err)
 		return nil, err
 	}
 
@@ -143,27 +152,37 @@ func (r *userRepo) GetUserByID(ctx context.Context, id uuid.UUID) (*domain.User,
 		u.AvatarURL = &avatar.String
 	}
 
+	log.Printf("[UserRepo] Found user: %s for ID: %s", u.Email, id)
 	return &u, nil
 }
 
 func (r *userRepo) StoreRefreshToken(ctx context.Context, userID uuid.UUID, token string, expiresAt time.Time) error {
+	log.Printf("[UserRepo] Storing refresh token for user ID: %s", userID)
 	query := `
 		INSERT INTO refresh_tokens (user_id, token, expires_at)
 		VALUES ($1, $2, $3)
 	`
 	_, err := r.db.Exec(ctx, query, userID, token, expiresAt)
+	if err != nil {
+		log.Printf("[UserRepo] StoreRefreshToken failed: %v", err)
+	}
 	return err
 }
 
 func (r *userRepo) RevokeRefreshToken(ctx context.Context, token string) error {
+	log.Printf("[UserRepo] Revoking refresh token")
 	query := `
 		UPDATE refresh_tokens SET revoked = TRUE WHERE token = $1
 	`
 	_, err := r.db.Exec(ctx, query, token)
+	if err != nil {
+		log.Printf("[UserRepo] RevokeRefreshToken failed: %v", err)
+	}
 	return err
 }
 
 func (r *userRepo) GetRefreshToken(ctx context.Context, token string) (uuid.UUID, error) {
+	log.Printf("[UserRepo] Validating refresh token")
 	query := `
 		SELECT user_id, expires_at, revoked FROM refresh_tokens WHERE token = $1
 	`
@@ -173,16 +192,20 @@ func (r *userRepo) GetRefreshToken(ctx context.Context, token string) (uuid.UUID
 
 	err := r.db.QueryRow(ctx, query, token).Scan(&userID, &expiresAt, &revoked)
 	if err != nil {
+		log.Printf("[UserRepo] GetRefreshToken failed (token might not exist): %v", err)
 		return uuid.Nil, err
 	}
 
 	if revoked {
+		log.Printf("[UserRepo] Refresh token is revoked for user ID: %s", userID)
 		return uuid.Nil, errors.New("token revoked")
 	}
 
 	if time.Now().After(expiresAt) {
+		log.Printf("[UserRepo] Refresh token is expired for user ID: %s", userID)
 		return uuid.Nil, errors.New("token expired")
 	}
 
+	log.Printf("[UserRepo] Refresh token is valid for user ID: %s", userID)
 	return userID, nil
 }

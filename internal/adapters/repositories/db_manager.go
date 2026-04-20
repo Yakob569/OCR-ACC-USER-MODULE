@@ -2,8 +2,8 @@ package repositories
 
 import (
 	"context"
+	"fmt"
 	"log"
-	"strconv"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -13,21 +13,11 @@ type DatabaseManager struct {
 }
 
 func NewDatabaseManager(ctx context.Context, user, pass, host, port, dbname string) *DatabaseManager {
-	// Parse a minimal valid DSN to get default config
-	poolConfig, err := pgxpool.ParseConfig("postgres://localhost:5432")
+	// Use a connection string that explicitly disables SSL for local development
+	connStr := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable", user, pass, host, port, dbname)
+	poolConfig, err := pgxpool.ParseConfig(connStr)
 	if err != nil {
-		log.Fatalf("Unable to parse base config: %v", err)
-	}
-
-	// Manually set fields to avoid URL encoding issues with special characters in password
-	poolConfig.ConnConfig.User = user
-	poolConfig.ConnConfig.Password = pass
-	poolConfig.ConnConfig.Host = host
-	poolConfig.ConnConfig.Database = dbname
-
-	p, err := strconv.ParseUint(port, 10, 16)
-	if err == nil {
-		poolConfig.ConnConfig.Port = uint16(p)
+		log.Fatalf("Unable to parse config: %v", err)
 	}
 
 	pool, err := pgxpool.NewWithConfig(ctx, poolConfig)

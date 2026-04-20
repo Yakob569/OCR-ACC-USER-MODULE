@@ -7,20 +7,23 @@ import (
 	"net/http"
 
 	"github.com/cashflow/auth-service/internal/adapters/handlers"
+	"github.com/cashflow/auth-service/internal/core/ports"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type Server struct {
 	port        string
 	userHandler *handlers.UserHandler
+	authSvc     ports.AuthService
 	db          *pgxpool.Pool
 	httpServer  *http.Server
 }
 
-func NewServer(port string, userHandler *handlers.UserHandler, db *pgxpool.Pool) *Server {
+func NewServer(port string, userHandler *handlers.UserHandler, authSvc ports.AuthService, db *pgxpool.Pool) *Server {
 	return &Server{
 		port:        port,
 		userHandler: userHandler,
+		authSvc:     authSvc,
 		db:          db,
 	}
 }

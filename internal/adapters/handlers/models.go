@@ -22,8 +22,14 @@ type RegisterResponse struct {
 }
 
 type TokenResponse struct {
-	Status      bool   `json:"status"`
-	AccessToken string `json:"access_token"`
+	Status       bool   `json:"status"`
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+	ExpiresAt    int64  `json:"expires_at"`
+}
+
+type RefreshTokenRequest struct {
+	RefreshToken string `json:"refresh_token"`
 }
 
 type SocialLoginResponse struct {

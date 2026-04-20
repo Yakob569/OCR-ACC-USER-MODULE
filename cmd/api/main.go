@@ -33,14 +33,14 @@ func main() {
 		dbManager.Close()
 	}()
 
-	// 2. Wire Hexagonal Architecture
-	authAdapter := auth.NewSupabaseAuthAdapter(cfg.SupabaseProjectRef, cfg.SupabaseURL, cfg.SupabaseKey)
+		// 2. Wire Hexagonal Architecture
+	authAdapter := auth.NewJWTAuthAdapter(cfg.JWTSecret)
 	userRepo := repositories.NewUserRepository(dbManager.Pool)
 	userSvc := services.NewUserService(userRepo, authAdapter)
 	userHandler := handlers.NewUserHandler(userSvc)
 
-	// 3. Initialize Server
-	server := api.NewServer(cfg.Port, userHandler, dbManager.Pool)
+		// 3. Initialize Server
+	server := api.NewServer(cfg.Port, userHandler, authAdapter, dbManager.Pool)
 	
 	// 4. Start Server in a goroutine
 	go func() {

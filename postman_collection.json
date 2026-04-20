@@ -1,8 +1,8 @@
 {
 	"info": {
 		"_postman_id": "4a4d95b2-3c87-4d6a-8b8a-9f5b6e7f8a9a",
-		"name": "Auth Service API",
-		"description": "Postman collection for the Cashflow Auth Service (Hexagonal Architecture)",
+		"name": "Cashflow Custom Auth API",
+		"description": "Postman collection for the updated Custom JWT Auth Service",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
 	},
 	"item": [
@@ -33,6 +33,21 @@
 			"item": [
 				{
 					"name": "Register User",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = pm.response.json();",
+									"if (jsonData.status && jsonData.tokens) {",
+									"    pm.environment.set(\"access_token\", jsonData.tokens.access_token);",
+									"    pm.environment.set(\"refresh_token\", jsonData.tokens.refresh_token);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
 					"request": {
 						"method": "POST",
 						"header": [
@@ -43,7 +58,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"email\": \"test@example.com\",\n    \"password\": \"password123\",\n    \"full_name\": \"John Doe\",\n    \"phone\": \"+251911223344\"\n}"
+							"raw": "{\n    \"email\": \"user@example.com\",\n    \"password\": \"secure-password\",\n    \"full_name\": \"Jane Doe\",\n    \"phone\": \"+251900112233\"\n}"
 						},
 						"url": {
 							"raw": "{{base_url}}/api/v1/register",
@@ -61,6 +76,21 @@
 				},
 				{
 					"name": "Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = pm.response.json();",
+									"if (jsonData.status) {",
+									"    pm.environment.set(\"access_token\", jsonData.access_token);",
+									"    pm.environment.set(\"refresh_token\", jsonData.refresh_token);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
 					"request": {
 						"method": "POST",
 						"header": [
@@ -71,7 +101,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"email\": \"test@example.com\",\n    \"password\": \"password123\"\n}"
+							"raw": "{\n    \"email\": \"user@example.com\",\n    \"password\": \"secure-password\"\n}"
 						},
 						"url": {
 							"raw": "{{base_url}}/api/v1/login",
@@ -88,7 +118,22 @@
 					"response": []
 				},
 				{
-					"name": "Forgot Password",
+					"name": "Refresh Token",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = pm.response.json();",
+									"if (jsonData.status) {",
+									"    pm.environment.set(\"access_token\", jsonData.access_token);",
+									"    pm.environment.set(\"refresh_token\", jsonData.refresh_token);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
 					"request": {
 						"method": "POST",
 						"header": [
@@ -99,43 +144,47 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"email\": \"test@example.com\"\n}"
+							"raw": "{\n    \"refresh_token\": \"{{refresh_token}}\"\n}"
 						},
 						"url": {
-							"raw": "{{base_url}}/api/v1/forgot-password",
+							"raw": "{{base_url}}/api/v1/refresh",
 							"host": [
 								"{{base_url}}"
 							],
 							"path": [
 								"api",
 								"v1",
-								"forgot-password"
+								"refresh"
 							]
 						}
 					},
 					"response": []
-				},
+				}
+			]
+		},
+		{
+			"name": "User",
+			"item": [
 				{
-					"name": "Social Login URL",
+					"name": "Get Profile",
 					"request": {
 						"method": "GET",
-						"header": [],
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}",
+								"type": "text"
+							}
+						],
 						"url": {
-							"raw": "{{base_url}}/api/v1/auth/social?provider=google",
+							"raw": "{{base_url}}/api/v1/profile",
 							"host": [
 								"{{base_url}}"
 							],
 							"path": [
 								"api",
 								"v1",
-								"auth",
-								"social"
-							],
-							"query": [
-								{
-									"key": "provider",
-									"value": "google"
-								}
+								"profile"
 							]
 						}
 					},
@@ -148,6 +197,16 @@
 		{
 			"key": "base_url",
 			"value": "http://localhost:8080",
+			"type": "string"
+		},
+		{
+			"key": "access_token",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "refresh_token",
+			"value": "",
 			"type": "string"
 		}
 	]

@@ -15,6 +15,7 @@ type Config struct {
 	DBPort      string
 	DBName      string
 	Port        string
+	JWTSecret   string
 	SupabaseURL        string
 	SupabaseKey        string
 	SupabaseProjectRef string
@@ -32,6 +33,7 @@ func LoadConfig() (*Config, error) {
 		DBPort:             getEnv("DB_PORT", "5432"),
 		DBName:             getEnv("DB_NAME", "postgres"),
 		Port:               getEnv("PORT", "8080"),
+		JWTSecret:          getEnv("JWT_SECRET", "change-me-at-all-costs"),
 		SupabaseURL:        getEnv("SUPABASE_URL", ""),
 		SupabaseKey:        getEnv("SUPABASE_KEY", ""),
 		SupabaseProjectRef: getEnv("SUPABASE_PROJECT_REF", ""),

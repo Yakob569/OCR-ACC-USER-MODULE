@@ -2,6 +2,8 @@ package repositories
 
 import (
 	"context"
+	"errors"
+	"time"
 
 	"github.com/cashflow/auth-service/internal/core/domain"
 	"github.com/cashflow/auth-service/internal/core/ports"
@@ -23,8 +25,8 @@ func NewUserRepository(db *pgxpool.Pool) ports.UserRepository {
 
 func (r *userRepo) CreateUser(ctx context.Context, u *domain.User) (*domain.User, error) {
 	query := `
-		INSERT INTO users (email, full_name, phone, role, auth_provider)
-		VALUES ($1, $2, $3, $4, $5)
+		INSERT INTO users (email, full_name, phone, role, auth_provider, password_hash)
+		VALUES ($1, $2, $3, $4, $5, $6)
 		RETURNING id, email, full_name, phone, role, is_active, email_verified, auth_provider, avatar_url, created_at, updated_at
 	`
 
@@ -37,6 +39,7 @@ func (r *userRepo) CreateUser(ctx context.Context, u *domain.User) (*domain.User
 		u.Phone,
 		u.Role,
 		u.AuthProvider,
+		u.PasswordHash,
 	).Scan(
 		&registered.ID,
 		&registered.Email,
@@ -67,16 +70,17 @@ func (r *userRepo) CreateUser(ctx context.Context, u *domain.User) (*domain.User
 
 func (r *userRepo) GetUserByEmail(ctx context.Context, email string) (*domain.User, error) {
 	query := `
-		SELECT id, email, full_name, phone, role, is_active, email_verified, auth_provider, avatar_url, created_at, updated_at
+		SELECT id, email, password_hash, full_name, phone, role, is_active, email_verified, auth_provider, avatar_url, created_at, updated_at
 		FROM users WHERE email = $1
 	`
 
 	var u domain.User
-	var phone, avatar pgtype.Text
+	var phone, avatar, pwdHash pgtype.Text
 
 	err := r.db.QueryRow(ctx, query, email).Scan(
 		&u.ID,
 		&u.Email,
+		&pwdHash,
 		&u.FullName,
 		&phone,
 		&u.Role,
@@ -92,6 +96,9 @@ func (r *userRepo) GetUserByEmail(ctx context.Context, email string) (*domain.Us
 		return nil, err
 	}
 
+	if pwdHash.Valid {
+		u.PasswordHash = pwdHash.String
+	}
 	if phone.Valid {
 		u.Phone = &phone.String
 	}
@@ -137,4 +144,45 @@ func (r *userRepo) GetUserByID(ctx context.Context, id uuid.UUID) (*domain.User,
 	}
 
 	return &u, nil
+}
+
+func (r *userRepo) StoreRefreshToken(ctx context.Context, userID uuid.UUID, token string, expiresAt time.Time) error {
+	query := `
+		INSERT INTO refresh_tokens (user_id, token, expires_at)
+		VALUES ($1, $2, $3)
+	`
+	_, err := r.db.Exec(ctx, query, userID, token, expiresAt)
+	return err
+}
+
+func (r *userRepo) RevokeRefreshToken(ctx context.Context, token string) error {
+	query := `
+		UPDATE refresh_tokens SET revoked = TRUE WHERE token = $1
+	`
+	_, err := r.db.Exec(ctx, query, token)
+	return err
+}
+
+func (r *userRepo) GetRefreshToken(ctx context.Context, token string) (uuid.UUID, error) {
+	query := `
+		SELECT user_id, expires_at, revoked FROM refresh_tokens WHERE token = $1
+	`
+	var userID uuid.UUID
+	var expiresAt time.Time
+	var revoked bool
+
+	err := r.db.QueryRow(ctx, query, token).Scan(&userID, &expiresAt, &revoked)
+	if err != nil {
+		return uuid.Nil, err
+	}
+
+	if revoked {
+		return uuid.Nil, errors.New("token revoked")
+	}
+
+	if time.Now().After(expiresAt) {
+		return uuid.Nil, errors.New("token expired")
+	}
+
+	return userID, nil
 }

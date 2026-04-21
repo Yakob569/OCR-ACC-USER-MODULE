@@ -1,0 +1,9 @@
+.git
+.github
+.vscode
+.idea
+
+.env
+.env.bak
+
+supabase

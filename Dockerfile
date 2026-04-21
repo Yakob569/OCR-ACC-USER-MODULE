@@ -18,6 +18,7 @@ RUN apk add --no-cache ca-certificates
 WORKDIR /app
 COPY --from=build /out/app /app/app
 COPY .env* /app/
+COPY db/migrations /app/db/migrations
 
 ENV PORT=8080
 EXPOSE 8080

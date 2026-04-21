@@ -107,52 +107,31 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Apply updated_at triggers
+DROP TRIGGER IF EXISTS trg_users_updated_at ON users;
 CREATE TRIGGER trg_users_updated_at
     BEFORE UPDATE ON users
     FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
+DROP TRIGGER IF EXISTS trg_merchants_updated_at ON merchants;
 CREATE TRIGGER trg_merchants_updated_at
     BEFORE UPDATE ON merchants
     FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
+DROP TRIGGER IF EXISTS trg_accounts_updated_at ON accounts;
 CREATE TRIGGER trg_accounts_updated_at
     BEFORE UPDATE ON accounts
     FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
+DROP TRIGGER IF EXISTS trg_transactions_updated_at ON transactions;
 CREATE TRIGGER trg_transactions_updated_at
     BEFORE UPDATE ON transactions
     FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
+DROP TRIGGER IF EXISTS trg_customers_updated_at ON customers;
 CREATE TRIGGER trg_customers_updated_at
     BEFORE UPDATE ON customers
     FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
 -- ============================================
--- Row Level Security (RLS)
+-- End of Schema
 -- ============================================
-ALTER TABLE users ENABLE ROW LEVEL SECURITY;
-ALTER TABLE merchants ENABLE ROW LEVEL SECURITY;
-ALTER TABLE accounts ENABLE ROW LEVEL SECURITY;
-ALTER TABLE transactions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE customers ENABLE ROW LEVEL SECURITY;
-
--- Service role can do everything (for backend)
-CREATE POLICY "Service role full access on users"
-    ON users FOR ALL
-    USING (auth.role() = 'service_role');
-
-CREATE POLICY "Service role full access on merchants"
-    ON merchants FOR ALL
-    USING (auth.role() = 'service_role');
-
-CREATE POLICY "Service role full access on accounts"
-    ON accounts FOR ALL
-    USING (auth.role() = 'service_role');
-
-CREATE POLICY "Service role full access on transactions"
-    ON transactions FOR ALL
-    USING (auth.role() = 'service_role');
-
-CREATE POLICY "Service role full access on customers"
-    ON customers FOR ALL
-    USING (auth.role() = 'service_role');

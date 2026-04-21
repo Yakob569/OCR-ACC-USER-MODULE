@@ -27,7 +27,7 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	dbManager := repositories.NewDatabaseManager(ctx, cfg.DBUser, cfg.DBPass, cfg.DBHost, cfg.DBPort, cfg.DBName)
+	dbManager := repositories.NewDatabaseManager(ctx, cfg.DatabaseURL, cfg.DBUser, cfg.DBPass, cfg.DBHost, cfg.DBPort, cfg.DBName)
 	defer func() {
 		log.Println("Closing database connection...")
 		dbManager.Close()

@@ -25,6 +25,9 @@ func NewUserRepository(db *pgxpool.Pool) ports.UserRepository {
 }
 
 func (r *userRepo) CreateUser(ctx context.Context, u *domain.User) (*domain.User, error) {
+	if r.db == nil {
+		return nil, errors.New("database connection is not available")
+	}
 	log.Printf("[UserRepo] Executing CreateUser for email: %s", u.Email)
 	query := `
 		INSERT INTO users (email, full_name, phone, role, auth_provider, password_hash)
@@ -73,6 +76,9 @@ func (r *userRepo) CreateUser(ctx context.Context, u *domain.User) (*domain.User
 }
 
 func (r *userRepo) GetUserByEmail(ctx context.Context, email string) (*domain.User, error) {
+	if r.db == nil {
+		return nil, errors.New("database connection is not available")
+	}
 	log.Printf("[UserRepo] Fetching user by email: %s", email)
 	query := `
 		SELECT id, email, password_hash, full_name, phone, role, is_active, email_verified, auth_provider, avatar_url, created_at, updated_at
@@ -117,6 +123,9 @@ func (r *userRepo) GetUserByEmail(ctx context.Context, email string) (*domain.Us
 }
 
 func (r *userRepo) GetUserByID(ctx context.Context, id uuid.UUID) (*domain.User, error) {
+	if r.db == nil {
+		return nil, errors.New("database connection is not available")
+	}
 	log.Printf("[UserRepo] Fetching user by ID: %s", id)
 	query := `
 		SELECT id, email, full_name, phone, role, is_active, email_verified, auth_provider, avatar_url, created_at, updated_at

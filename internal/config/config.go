@@ -1,7 +1,6 @@
 package config
 
 import (
-	"fmt"
 	"log"
 	"os"
 
@@ -9,13 +8,14 @@ import (
 )
 
 type Config struct {
-	DBUser      string
-	DBPass      string
-	DBHost      string
-	DBPort      string
-	DBName      string
-	Port        string
-	JWTSecret   string
+	DatabaseURL        string
+	DBUser             string
+	DBPass             string
+	DBHost             string
+	DBPort             string
+	DBName             string
+	Port               string
+	JWTSecret          string
 	SupabaseURL        string
 	SupabaseKey        string
 	SupabaseProjectRef string
@@ -27,8 +27,9 @@ func LoadConfig() (*Config, error) {
 	}
 
 	cfg := &Config{
-		DBUser:             getEnv("DB_USER", ""),
-		DBPass:             getEnv("DB_PASS", ""),
+		DatabaseURL:        getEnv("DATABASE_URL", ""),
+		DBUser:             getEnv("DB_USER", "postgres"),
+		DBPass:             getEnv("DB_PASS", "postgres"),
 		DBHost:             getEnv("DB_HOST", "localhost"),
 		DBPort:             getEnv("DB_PORT", "5432"),
 		DBName:             getEnv("DB_NAME", "postgres"),
@@ -39,8 +40,8 @@ func LoadConfig() (*Config, error) {
 		SupabaseProjectRef: getEnv("SUPABASE_PROJECT_REF", ""),
 	}
 
-	if cfg.DBPass == "" {
-		return nil, fmt.Errorf("DB_PASS is a required environment variable")
+	if cfg.DatabaseURL == "" && cfg.DBPass == "" {
+		log.Println("Warning: Neither DATABASE_URL nor DB_PASS is set, using default values")
 	}
 
 	return cfg, nil

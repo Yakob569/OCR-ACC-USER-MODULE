@@ -18,8 +18,8 @@
 go.work
 
 # Environment variables
-.env
-.env.bak
+#.env
+#.env.bak
 
 # IDEs
 .vscode/
@@ -33,3 +33,4 @@ type_check
 
 # Supabase
 supabase/.temp/
+

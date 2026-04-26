@@ -13,6 +13,7 @@ import (
 	"github.com/cashflow/auth-service/internal/adapters/auth"
 	"github.com/cashflow/auth-service/internal/adapters/handlers"
 	"github.com/cashflow/auth-service/internal/adapters/repositories"
+	"github.com/cashflow/auth-service/internal/adapters/storage"
 	"github.com/cashflow/auth-service/internal/config"
 	"github.com/cashflow/auth-service/internal/core/services"
 )
@@ -41,10 +42,17 @@ func main() {
 	authAdapter := auth.NewJWTAuthAdapter(cfg.JWTSecret)
 	userRepo := repositories.NewUserRepository(dbManager.Pool)
 	groupRepo := repositories.NewReceiptGroupRepository(dbManager.Pool)
+	imageRepo := repositories.NewReceiptImageRepository(dbManager.Pool)
+	jobRepo := repositories.NewOCRJobRepository(dbManager.Pool)
+	objectStorageSvc, err := storage.NewObjectStorageService(cfg.MinIO)
+	if err != nil {
+		log.Fatal(err)
+	}
 	userSvc := services.NewUserService(userRepo, authAdapter)
 	groupSvc := services.NewReceiptGroupService(groupRepo)
+	uploadSvc := services.NewReceiptUploadService(groupRepo, imageRepo, jobRepo, objectStorageSvc, cfg.OCRGroupMaxFiles, cfg.OCRMaxFileSizeMB)
 	userHandler := handlers.NewUserHandler(userSvc)
-	groupHandler := handlers.NewGroupHandler(groupSvc)
+	groupHandler := handlers.NewGroupHandler(groupSvc, uploadSvc)
 
 	// 3. Initialize Server
 	server := api.NewServer(cfg.Port, userHandler, groupHandler, authAdapter, dbManager.Pool)

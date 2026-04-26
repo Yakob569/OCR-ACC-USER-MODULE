@@ -30,7 +30,13 @@ func (s *Server) RegisterRoutes() http.Handler {
 
 		w.WriteHeader(http.StatusMethodNotAllowed)
 	})
-	protectedMux.HandleFunc("/api/v1/groups/", s.groupHandler.GetGroup)
+	protectedMux.HandleFunc("/api/v1/groups/", func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "/images") {
+			s.groupHandler.UploadGroupImages(w, r)
+			return
+		}
+		s.groupHandler.GetGroup(w, r)
+	})
 
 	// Wrap protected routes with AuthMiddleware
 	authMiddleware := AuthMiddleware(s.authSvc)

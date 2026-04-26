@@ -219,10 +219,10 @@ func (r *receiptImageRepo) CreateMany(ctx context.Context, inputs []domain.Recei
 
 	query := `
 		INSERT INTO receipt_images (
-			group_id, user_id, original_filename, mime_type, file_size_bytes, checksum_sha256,
+			id, group_id, user_id, original_filename, mime_type, file_size_bytes, checksum_sha256,
 			storage_bucket, storage_object_key, storage_url, upload_status, ocr_status, review_status
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NULLIF($9, ''), $10, $11, $12)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NULLIF($10, ''), $11, $12, $13)
 		RETURNING id, group_id, user_id, original_filename, mime_type, file_size_bytes, checksum_sha256,
 		          storage_bucket, storage_object_key, storage_url, upload_status, ocr_status, review_status,
 		          ocr_attempt_count, last_error_code, last_error_message, receipt_type, overall_confidence,
@@ -237,6 +237,7 @@ func (r *receiptImageRepo) CreateMany(ctx context.Context, inputs []domain.Recei
 		var processedAt pgtype.Timestamptz
 
 		err := tx.QueryRow(ctx, query,
+			input.ID,
 			input.GroupID,
 			input.UserID,
 			input.OriginalFilename,
@@ -482,7 +483,7 @@ func (r *ocrExtractionRepo) GetByReceiptImageID(ctx context.Context, receiptImag
 	return &extraction, nil
 }
 
-func (r *ocrJobRepo) CreateMany(ctx context.Context, jobs []domain.OCRJob) ([]domain.OCRJob, error) {
+func (r *ocrJobRepo) CreateMany(ctx context.Context, jobs []ports.OCRJobCreateInput) ([]domain.OCRJob, error) {
 	if r.db == nil {
 		return nil, errors.New("database connection is not available")
 	}
@@ -521,11 +522,11 @@ func (r *ocrJobRepo) CreateMany(ctx context.Context, jobs []domain.OCRJob) ([]do
 			job.AttemptCount,
 			job.MaxAttempts,
 			job.QueuedAt,
-			job.StartedAt,
-			job.FinishedAt,
-			job.WorkerID,
-			job.ErrorCode,
-			job.ErrorMessage,
+			nil,
+			nil,
+			nil,
+			nil,
+			nil,
 		).Scan(
 			&created.ID,
 			&created.ReceiptImageID,

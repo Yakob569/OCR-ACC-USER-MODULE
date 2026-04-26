@@ -3,6 +3,7 @@ package ports
 import (
 	"context"
 	"io"
+	"time"
 
 	"github.com/cashflow/auth-service/internal/core/domain"
 	"github.com/google/uuid"
@@ -32,7 +33,7 @@ type OCRExtractionRepository interface {
 }
 
 type OCRJobRepository interface {
-	CreateMany(ctx context.Context, jobs []domain.OCRJob) ([]domain.OCRJob, error)
+	CreateMany(ctx context.Context, jobs []OCRJobCreateInput) ([]domain.OCRJob, error)
 	ListQueued(ctx context.Context, limit int) ([]domain.OCRJob, error)
 	GetByID(ctx context.Context, id uuid.UUID) (*domain.OCRJob, error)
 	UpdateStatus(ctx context.Context, id uuid.UUID, status string, workerID, errorCode, errorMessage *string) error
@@ -54,7 +55,7 @@ type ReceiptGroupService interface {
 }
 
 type ReceiptUploadService interface {
-	UploadGroupImages(ctx context.Context, groupID, userID uuid.UUID, files []ReceiptFile) ([]domain.ReceiptImage, []domain.OCRJob, error)
+	UploadGroupImages(ctx context.Context, groupID, userID uuid.UUID, files []ReceiptFile) (*ReceiptUploadResult, error)
 }
 
 type OCRJobService interface {
@@ -69,5 +70,20 @@ type ReceiptFile struct {
 	Filename      string
 	ContentType   string
 	ContentLength int64
-	Content       io.Reader
+	Bytes         []byte
+}
+
+type ReceiptUploadResult struct {
+	Images []domain.ReceiptImage
+	Jobs   []domain.OCRJob
+}
+
+type OCRJobCreateInput struct {
+	ReceiptImageID uuid.UUID
+	GroupID        uuid.UUID
+	UserID         uuid.UUID
+	Status         string
+	AttemptCount   int
+	MaxAttempts    int
+	QueuedAt       time.Time
 }

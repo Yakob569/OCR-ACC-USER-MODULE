@@ -2,6 +2,9 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
+	"io"
+	"mime/multipart"
 	"net/http"
 	"strconv"
 	"strings"
@@ -12,11 +15,12 @@ import (
 )
 
 type GroupHandler struct {
-	svc ports.ReceiptGroupService
+	svc       ports.ReceiptGroupService
+	uploadSvc ports.ReceiptUploadService
 }
 
-func NewGroupHandler(svc ports.ReceiptGroupService) *GroupHandler {
-	return &GroupHandler{svc: svc}
+func NewGroupHandler(svc ports.ReceiptGroupService, uploadSvc ports.ReceiptUploadService) *GroupHandler {
+	return &GroupHandler{svc: svc, uploadSvc: uploadSvc}
 }
 
 func (h *GroupHandler) CreateGroup(w http.ResponseWriter, r *http.Request) {
@@ -137,6 +141,66 @@ func (h *GroupHandler) GetGroup(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (h *GroupHandler) UploadGroupImages(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: "Only POST is allowed"})
+		return
+	}
+
+	userID, ok := requestUserID(r)
+	if !ok {
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: "Unauthorized"})
+		return
+	}
+
+	groupID, err := nestedGroupIDFromPath(r.URL.Path, "images")
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: "Invalid group ID"})
+		return
+	}
+
+	if err := r.ParseMultipartForm(64 << 20); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: "Invalid multipart form data"})
+		return
+	}
+
+	fileHeaders := r.MultipartForm.File["files"]
+	if len(fileHeaders) == 0 {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: "At least one file is required"})
+		return
+	}
+
+	files, err := readReceiptFiles(fileHeaders)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: err.Error()})
+		return
+	}
+
+	result, err := h.uploadSvc.UploadGroupImages(r.Context(), groupID, userID, files)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: err.Error()})
+		return
+	}
+
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(struct {
+		Status bool                       `json:"status"`
+		Data   *ports.ReceiptUploadResult `json:"data"`
+	}{
+		Status: true,
+		Data:   result,
+	})
+}
+
 func requestUserID(r *http.Request) (uuid.UUID, bool) {
 	val := r.Context().Value("user_id")
 	if val == nil {
@@ -163,4 +227,42 @@ func queryInt(r *http.Request, key string, fallback int) int {
 func groupIDFromPath(path string) (uuid.UUID, error) {
 	idPart := strings.TrimPrefix(path, "/api/v1/groups/")
 	return uuid.Parse(strings.TrimSpace(idPart))
+}
+
+func nestedGroupIDFromPath(path string, tail string) (uuid.UUID, error) {
+	trimmed := strings.Trim(path, "/")
+	parts := strings.Split(trimmed, "/")
+	if len(parts) != 5 || parts[4] != tail {
+		return uuid.Nil, fmt.Errorf("invalid nested group path")
+	}
+	return uuid.Parse(parts[3])
+}
+
+func readReceiptFiles(fileHeaders []*multipart.FileHeader) ([]ports.ReceiptFile, error) {
+	files := make([]ports.ReceiptFile, 0, len(fileHeaders))
+	for _, header := range fileHeaders {
+		file, err := header.Open()
+		if err != nil {
+			return nil, err
+		}
+
+		bytes, readErr := io.ReadAll(file)
+		closeErr := file.Close()
+		if readErr != nil {
+			return nil, readErr
+		}
+		if closeErr != nil {
+			return nil, closeErr
+		}
+
+		contentType := header.Header.Get("Content-Type")
+		files = append(files, ports.ReceiptFile{
+			Filename:      header.Filename,
+			ContentType:   contentType,
+			ContentLength: header.Size,
+			Bytes:         bytes,
+		})
+	}
+
+	return files, nil
 }

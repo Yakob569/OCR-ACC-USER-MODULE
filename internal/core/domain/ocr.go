@@ -134,6 +134,7 @@ type CreateReceiptGroupInput struct {
 }
 
 type ReceiptImageUploadInput struct {
+	ID               uuid.UUID
 	GroupID          uuid.UUID
 	UserID           uuid.UUID
 	OriginalFilename string

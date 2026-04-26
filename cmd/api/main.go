@@ -40,11 +40,14 @@ func main() {
 	// 2. Wire Hexagonal Architecture
 	authAdapter := auth.NewJWTAuthAdapter(cfg.JWTSecret)
 	userRepo := repositories.NewUserRepository(dbManager.Pool)
+	groupRepo := repositories.NewReceiptGroupRepository(dbManager.Pool)
 	userSvc := services.NewUserService(userRepo, authAdapter)
+	groupSvc := services.NewReceiptGroupService(groupRepo)
 	userHandler := handlers.NewUserHandler(userSvc)
+	groupHandler := handlers.NewGroupHandler(groupSvc)
 
 	// 3. Initialize Server
-	server := api.NewServer(cfg.Port, userHandler, authAdapter, dbManager.Pool)
+	server := api.NewServer(cfg.Port, userHandler, groupHandler, authAdapter, dbManager.Pool)
 
 	// 4. Start Server in a goroutine
 	go func() {

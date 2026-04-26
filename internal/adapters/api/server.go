@@ -12,19 +12,21 @@ import (
 )
 
 type Server struct {
-	port        string
-	userHandler *handlers.UserHandler
-	authSvc     ports.AuthService
-	db          *pgxpool.Pool
-	httpServer  *http.Server
+	port         string
+	userHandler  *handlers.UserHandler
+	groupHandler *handlers.GroupHandler
+	authSvc      ports.AuthService
+	db           *pgxpool.Pool
+	httpServer   *http.Server
 }
 
-func NewServer(port string, userHandler *handlers.UserHandler, authSvc ports.AuthService, db *pgxpool.Pool) *Server {
+func NewServer(port string, userHandler *handlers.UserHandler, groupHandler *handlers.GroupHandler, authSvc ports.AuthService, db *pgxpool.Pool) *Server {
 	return &Server{
-		port:        port,
-		userHandler: userHandler,
-		authSvc:     authSvc,
-		db:          db,
+		port:         port,
+		userHandler:  userHandler,
+		groupHandler: groupHandler,
+		authSvc:      authSvc,
+		db:           db,
 	}
 }
 

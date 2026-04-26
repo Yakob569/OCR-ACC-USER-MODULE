@@ -50,3 +50,8 @@ type MessageResponse struct {
 	Status  bool   `json:"status"`
 	Message string `json:"message"`
 }
+
+type CreateGroupRequest struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}

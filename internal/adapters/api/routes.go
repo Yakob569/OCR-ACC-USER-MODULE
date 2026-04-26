@@ -1,6 +1,9 @@
 package api
 
-import "net/http"
+import (
+	"net/http"
+	"strings"
+)
 
 func (s *Server) RegisterRoutes() http.Handler {
 	mux := http.NewServeMux()
@@ -15,13 +18,26 @@ func (s *Server) RegisterRoutes() http.Handler {
 	// Protected Routes
 	protectedMux := http.NewServeMux()
 	protectedMux.HandleFunc("/api/v1/profile", s.userHandler.GetProfile)
+	protectedMux.HandleFunc("/api/v1/groups", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			s.groupHandler.CreateGroup(w, r)
+			return
+		}
+		if r.Method == http.MethodGet {
+			s.groupHandler.ListGroups(w, r)
+			return
+		}
+
+		w.WriteHeader(http.StatusMethodNotAllowed)
+	})
+	protectedMux.HandleFunc("/api/v1/groups/", s.groupHandler.GetGroup)
 
 	// Wrap protected routes with AuthMiddleware
 	authMiddleware := AuthMiddleware(s.authSvc)
 
 	// Final handler that routes to either mux
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/v1/profile" {
+		if r.URL.Path == "/api/v1/profile" || r.URL.Path == "/api/v1/groups" || strings.HasPrefix(r.URL.Path, "/api/v1/groups/") {
 			authMiddleware(protectedMux).ServeHTTP(w, r)
 			return
 		}

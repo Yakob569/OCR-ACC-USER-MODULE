@@ -12,6 +12,7 @@ import (
 	"github.com/cashflow/auth-service/internal/adapters/api"
 	"github.com/cashflow/auth-service/internal/adapters/auth"
 	"github.com/cashflow/auth-service/internal/adapters/handlers"
+	"github.com/cashflow/auth-service/internal/adapters/ocrclient"
 	"github.com/cashflow/auth-service/internal/adapters/repositories"
 	"github.com/cashflow/auth-service/internal/adapters/storage"
 	"github.com/cashflow/auth-service/internal/config"
@@ -43,14 +44,17 @@ func main() {
 	userRepo := repositories.NewUserRepository(dbManager.Pool)
 	groupRepo := repositories.NewReceiptGroupRepository(dbManager.Pool)
 	imageRepo := repositories.NewReceiptImageRepository(dbManager.Pool)
+	extractionRepo := repositories.NewOCRExtractionRepository(dbManager.Pool)
 	jobRepo := repositories.NewOCRJobRepository(dbManager.Pool)
 	objectStorageSvc, err := storage.NewObjectStorageService(cfg.MinIO)
 	if err != nil {
 		log.Fatal(err)
 	}
+	ocrEngineSvc := ocrclient.NewOCREngineService(cfg.OCREngine)
 	userSvc := services.NewUserService(userRepo, authAdapter)
 	groupSvc := services.NewReceiptGroupService(groupRepo)
 	uploadSvc := services.NewReceiptUploadService(groupRepo, imageRepo, jobRepo, objectStorageSvc, cfg.OCRGroupMaxFiles, cfg.OCRMaxFileSizeMB)
+	ocrJobSvc := services.NewOCRJobService(jobRepo, imageRepo, extractionRepo, groupRepo, objectStorageSvc, ocrEngineSvc, cfg.OCREngine.MaxConcurrency)
 	userHandler := handlers.NewUserHandler(userSvc)
 	groupHandler := handlers.NewGroupHandler(groupSvc, uploadSvc)
 
@@ -63,6 +67,8 @@ func main() {
 			log.Fatalf("Server failed: %v", err)
 		}
 	}()
+
+	go ocrJobSvc.StartWorkers(ctx)
 
 	// 5. Wait for interrupt signal
 	<-ctx.Done()

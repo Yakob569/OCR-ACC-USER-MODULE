@@ -35,6 +35,7 @@ type OCRExtractionRepository interface {
 type OCRJobRepository interface {
 	CreateMany(ctx context.Context, jobs []OCRJobCreateInput) ([]domain.OCRJob, error)
 	ListQueued(ctx context.Context, limit int) ([]domain.OCRJob, error)
+	ClaimQueued(ctx context.Context, workerID string, limit int) ([]domain.OCRJob, error)
 	GetByID(ctx context.Context, id uuid.UUID) (*domain.OCRJob, error)
 	UpdateStatus(ctx context.Context, id uuid.UUID, status string, workerID, errorCode, errorMessage *string) error
 	IncrementAttempt(ctx context.Context, id uuid.UUID) error
@@ -42,6 +43,7 @@ type OCRJobRepository interface {
 
 type ObjectStorageService interface {
 	UploadReceiptImage(ctx context.Context, userID, groupID, imageID uuid.UUID, filename, contentType string, content io.Reader, contentLength int64) (bucket string, objectKey string, objectURL *string, err error)
+	DownloadReceiptImage(ctx context.Context, bucket, objectKey string) ([]byte, error)
 }
 
 type OCREngineService interface {
@@ -60,6 +62,7 @@ type ReceiptUploadService interface {
 
 type OCRJobService interface {
 	ProcessJob(ctx context.Context, jobID uuid.UUID) error
+	StartWorkers(ctx context.Context)
 }
 
 type DashboardService interface {

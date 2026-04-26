@@ -70,8 +70,22 @@ func (s *minioObjectStorageService) UploadReceiptImage(ctx context.Context, user
 	return s.bucket, objectKey, &objectURL, nil
 }
 
+func (s *minioObjectStorageService) DownloadReceiptImage(ctx context.Context, bucket, objectKey string) ([]byte, error) {
+	object, err := s.client.GetObject(ctx, bucket, objectKey, minio.GetObjectOptions{})
+	if err != nil {
+		return nil, err
+	}
+	defer object.Close()
+
+	return io.ReadAll(object)
+}
+
 func (s *disabledObjectStorageService) UploadReceiptImage(ctx context.Context, userID, groupID, imageID uuid.UUID, filename, contentType string, content io.Reader, contentLength int64) (string, string, *string, error) {
 	return "", "", nil, fmt.Errorf("object storage is unavailable: %s", s.reason)
+}
+
+func (s *disabledObjectStorageService) DownloadReceiptImage(ctx context.Context, bucket, objectKey string) ([]byte, error) {
+	return nil, fmt.Errorf("object storage is unavailable: %s", s.reason)
 }
 
 func buildObjectKey(userID, groupID, imageID uuid.UUID, filename string) string {

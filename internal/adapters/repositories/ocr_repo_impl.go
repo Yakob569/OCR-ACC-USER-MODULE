@@ -596,6 +596,70 @@ func (r *ocrJobRepo) ListQueued(ctx context.Context, limit int) ([]domain.OCRJob
 	return jobs, rows.Err()
 }
 
+func (r *ocrJobRepo) ClaimQueued(ctx context.Context, workerID string, limit int) ([]domain.OCRJob, error) {
+	if r.db == nil {
+		return nil, errors.New("database connection is not available")
+	}
+	if limit <= 0 {
+		return []domain.OCRJob{}, nil
+	}
+
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+
+	query := `
+		WITH claimed AS (
+			SELECT id
+			FROM ocr_jobs
+			WHERE status IN ($1, $2)
+			ORDER BY queued_at ASC
+			FOR UPDATE SKIP LOCKED
+			LIMIT $3
+		)
+		UPDATE ocr_jobs
+		SET status = $4,
+		    worker_id = $5,
+		    started_at = NOW()
+		WHERE id IN (SELECT id FROM claimed)
+		RETURNING id, receipt_image_id, group_id, user_id, status, attempt_count, max_attempts,
+		          queued_at, started_at, finished_at, worker_id, error_code, error_message,
+		          created_at, updated_at
+	`
+
+	rows, err := tx.Query(ctx, query,
+		domain.JobStatusQueued,
+		domain.JobStatusRetrying,
+		limit,
+		domain.JobStatusProcessing,
+		workerID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var jobs []domain.OCRJob
+	for rows.Next() {
+		job, err := scanOCRJob(rows)
+		if err != nil {
+			return nil, err
+		}
+		jobs = append(jobs, *job)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+
+	return jobs, nil
+}
+
 func (r *ocrJobRepo) GetByID(ctx context.Context, id uuid.UUID) (*domain.OCRJob, error) {
 	if r.db == nil {
 		return nil, errors.New("database connection is not available")

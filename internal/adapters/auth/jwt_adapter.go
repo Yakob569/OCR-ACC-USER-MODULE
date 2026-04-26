@@ -3,6 +3,7 @@ package auth
 import (
 	"errors"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/cashflow/auth-service/internal/core/domain"
@@ -62,7 +63,6 @@ func (a *jwtAuthAdapter) GenerateTokenPair(user *domain.User) (*domain.TokenPair
 	}
 	log.Printf("✅ [JWTAuthAdapter.GenerateTokenPair] Access token generated for user ID: %s", user.ID)
 
-
 	// Refresh Token (simplified for this implementation, just a random UUID or longer JWT)
 	refreshClaims := jwt.MapClaims{
 		"sub":        user.ID.String(),
@@ -77,7 +77,6 @@ func (a *jwtAuthAdapter) GenerateTokenPair(user *domain.User) (*domain.TokenPair
 		return nil, err
 	}
 	log.Printf("✅ [JWTAuthAdapter.GenerateTokenPair] Refresh token generated for user ID: %s", user.ID)
-
 
 	log.Printf("⬅️  [JWTAuthAdapter.GenerateTokenPair] Token pair generated successfully for user ID: %s", user.ID)
 	return &domain.TokenPair{

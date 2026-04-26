@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"mime/multipart"
 	"net/http"
 	"strings"
@@ -45,6 +46,8 @@ func (s *httpOCREngineService) Extract(ctx context.Context, filename, contentTyp
 		return nil, fmt.Errorf("OCR_ENGINE_BASE_URL is not configured")
 	}
 
+	start := time.Now()
+
 	fileBytes, err := io.ReadAll(content)
 	if err != nil {
 		return nil, err
@@ -72,21 +75,43 @@ func (s *httpOCREngineService) Extract(ctx context.Context, filename, contentTyp
 		req.Header.Set("X-Original-Content-Type", contentType)
 	}
 
+	log.Printf("[OCREngineHTTP] request method=%s url=%s filename=%q original_content_type=%q bytes=%d", req.Method, req.URL.String(), filename, contentType, len(fileBytes))
+
 	resp, err := s.client.Do(req)
 	if err != nil {
+		log.Printf("[OCREngineHTTP] error url=%s duration_ms=%d err=%v", req.URL.String(), time.Since(start).Milliseconds(), err)
 		return nil, err
 	}
 	defer resp.Body.Close()
 
+	const maxResponseBytes = 10 << 20 // 10 MiB
+	respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes+1))
+	if err != nil {
+		log.Printf("[OCREngineHTTP] error_reading_body url=%s status=%d duration_ms=%d err=%v", req.URL.String(), resp.StatusCode, time.Since(start).Milliseconds(), err)
+		return nil, err
+	}
+	if len(respBody) > maxResponseBytes {
+		log.Printf("[OCREngineHTTP] error_body_too_large url=%s status=%d duration_ms=%d body_bytes=%d", req.URL.String(), resp.StatusCode, time.Since(start).Milliseconds(), len(respBody))
+		return nil, fmt.Errorf("OCR engine response too large (>%d bytes)", maxResponseBytes)
+	}
+
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		respBody, _ := io.ReadAll(resp.Body)
+		bodySnippet := truncateForLog(string(respBody), 4096)
+		log.Printf("[OCREngineHTTP] error_response url=%s status=%d duration_ms=%d body=%q", req.URL.String(), resp.StatusCode, time.Since(start).Milliseconds(), bodySnippet)
 		return nil, fmt.Errorf("OCR engine returned status %d: %s", resp.StatusCode, strings.TrimSpace(string(respBody)))
 	}
 
 	var payload ocrEngineResponse
-	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+	if err := json.Unmarshal(respBody, &payload); err != nil {
+		log.Printf("[OCREngineHTTP] error_decoding_json url=%s status=%d duration_ms=%d body=%q err=%v", req.URL.String(), resp.StatusCode, time.Since(start).Milliseconds(), truncateForLog(string(respBody), 4096), err)
 		return nil, err
 	}
+
+	rawTextLen := 0
+	if payload.RawText != nil {
+		rawTextLen = len(*payload.RawText)
+	}
+	log.Printf("[OCREngineHTTP] response url=%s status=%d duration_ms=%d success=%t receipt_type=%q fields_bytes=%d items_bytes=%d warnings_bytes=%d debug_bytes=%d raw_text_len=%d", req.URL.String(), resp.StatusCode, time.Since(start).Milliseconds(), payload.Success, payload.ReceiptType, len(payload.Fields), len(payload.Items), len(payload.Warnings), len(payload.Debug), rawTextLen)
 
 	receiptType := stringPtrIfNonEmpty(payload.ReceiptType)
 	extraction := &domain.OCRExtraction{
@@ -168,4 +193,15 @@ func timeDurationSeconds(seconds int) time.Duration {
 		seconds = 60
 	}
 	return time.Duration(seconds) * time.Second
+}
+
+func truncateForLog(value string, max int) string {
+	value = strings.TrimSpace(value)
+	value = strings.ReplaceAll(value, "\n", " ")
+	value = strings.ReplaceAll(value, "\r", " ")
+	value = strings.ReplaceAll(value, "\t", " ")
+	if max <= 0 || len(value) <= max {
+		return value
+	}
+	return value[:max] + "...(truncated)"
 }

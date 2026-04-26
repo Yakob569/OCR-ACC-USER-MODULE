@@ -4,10 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"mime/multipart"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/cashflow/auth-service/internal/core/domain"
 	"github.com/cashflow/auth-service/internal/core/ports"
@@ -213,6 +215,8 @@ func (h *GroupHandler) ListGroupImages(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	start := time.Now()
+
 	userID, ok := requestUserID(r)
 	if !ok {
 		w.WriteHeader(http.StatusUnauthorized)
@@ -227,13 +231,19 @@ func (h *GroupHandler) ListGroupImages(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	images, err := h.querySvc.ListGroupImages(r.Context(), userID, groupID, queryInt(r, "limit", 20), queryInt(r, "offset", 0))
+	limit := queryInt(r, "limit", 20)
+	offset := queryInt(r, "offset", 0)
+	log.Printf("[GroupHandler.ListGroupImages] request method=%s path=%s user_id=%s group_id=%s limit=%d offset=%d", r.Method, r.URL.Path, userID, groupID, limit, offset)
+
+	images, err := h.querySvc.ListGroupImages(r.Context(), userID, groupID, limit, offset)
 	if err != nil {
+		log.Printf("[GroupHandler.ListGroupImages] error user_id=%s group_id=%s limit=%d offset=%d err=%v", userID, groupID, limit, offset, err)
 		w.WriteHeader(http.StatusNotFound)
 		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: err.Error()})
 		return
 	}
 
+	log.Printf("[GroupHandler.ListGroupImages] response user_id=%s group_id=%s count=%d duration_ms=%d", userID, groupID, len(images), time.Since(start).Milliseconds())
 	json.NewEncoder(w).Encode(struct {
 		Status bool                  `json:"status"`
 		Data   []domain.ReceiptImage `json:"data"`

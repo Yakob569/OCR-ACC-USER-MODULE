@@ -85,6 +85,8 @@ func (s *ocrJobService) StartWorkers(ctx context.Context) {
 }
 
 func (s *ocrJobService) ProcessJob(ctx context.Context, jobID uuid.UUID) error {
+	start := time.Now()
+
 	job, err := s.jobRepo.GetByID(ctx, jobID)
 	if err != nil {
 		return err
@@ -100,6 +102,8 @@ func (s *ocrJobService) ProcessJob(ctx context.Context, jobID uuid.UUID) error {
 		return err
 	}
 
+	log.Printf("[OCRJobService] start job=%s worker=%s attempt=%d/%d image=%s group=%s user=%s filename=%q", job.ID, s.workerID, job.AttemptCount+1, job.MaxAttempts, image.ID, image.GroupID, image.UserID, image.OriginalFilename)
+
 	if err := s.imageRepo.UpdateStatuses(ctx, image.ID, image.UploadStatus, domain.OCRStatusProcessing, image.ReviewStatus); err != nil {
 		return err
 	}
@@ -107,12 +111,15 @@ func (s *ocrJobService) ProcessJob(ctx context.Context, jobID uuid.UUID) error {
 
 	imageBytes, err := s.objectStorage.DownloadReceiptImage(ctx, image.StorageBucket, image.StorageObjectKey)
 	if err != nil {
+		log.Printf("[OCRJobService] download_failed job=%s image=%s bucket=%q object=%q err=%v", job.ID, image.ID, image.StorageBucket, image.StorageObjectKey, err)
 		_ = s.failJob(ctx, job, "object_download_failed", err.Error())
 		return err
 	}
 
+	log.Printf("[OCRJobService] downloaded job=%s image=%s bytes=%d", job.ID, image.ID, len(imageBytes))
 	result, err := s.ocrEngine.Extract(ctx, image.OriginalFilename, image.MIMEType, bytes.NewReader(imageBytes))
 	if err != nil {
+		log.Printf("[OCRJobService] ocr_engine_failed job=%s image=%s err=%v", job.ID, image.ID, err)
 		_ = s.failJob(ctx, job, "ocr_engine_failed", err.Error())
 		return err
 	}
@@ -122,11 +129,13 @@ func (s *ocrJobService) ProcessJob(ctx context.Context, jobID uuid.UUID) error {
 	result.Extraction.OCREngineURL = &engineURL
 
 	if err := s.extractionRepo.Upsert(ctx, result.Extraction); err != nil {
+		log.Printf("[OCRJobService] extraction_persist_failed job=%s image=%s err=%v", job.ID, image.ID, err)
 		_ = s.failJob(ctx, job, "extraction_persist_failed", err.Error())
 		return err
 	}
 
 	if err := s.imageRepo.UpdateProcessingResult(ctx, image.ID, result.OCRStatus, result.ReceiptType, result.Confidence, nil, nil); err != nil {
+		log.Printf("[OCRJobService] image_update_failed job=%s image=%s err=%v", job.ID, image.ID, err)
 		_ = s.failJob(ctx, job, "image_update_failed", err.Error())
 		return err
 	}
@@ -136,6 +145,7 @@ func (s *ocrJobService) ProcessJob(ctx context.Context, jobID uuid.UUID) error {
 	}
 
 	_, _ = s.groupRepo.RefreshAggregateState(ctx, image.GroupID)
+	log.Printf("[OCRJobService] completed job=%s image=%s ocr_status=%s receipt_type=%v confidence=%v duration_ms=%d", job.ID, image.ID, result.OCRStatus, result.ReceiptType, result.Confidence, time.Since(start).Milliseconds())
 	return nil
 }
 

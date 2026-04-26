@@ -77,6 +77,20 @@ func (h *UserHandler) Register(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func tokenPrefixAndLen(token string, maxPrefix int) (string, int) {
+	token = strings.TrimSpace(token)
+	if token == "" {
+		return "", 0
+	}
+	if maxPrefix <= 0 {
+		return "", len(token)
+	}
+	if len(token) <= maxPrefix {
+		return token, len(token)
+	}
+	return token[:maxPrefix], len(token)
+}
+
 func (h *UserHandler) Login(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	log.Printf("➡️  [Login] Received request from %s", r.RemoteAddr)
@@ -138,9 +152,18 @@ func (h *UserHandler) RefreshToken(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Log the received payload
-	log.Printf("ℹ️  [RefreshToken] Payload received: RefreshToken (truncated)=%s...", body.RefreshToken[:10]) // Truncate for security
+	refreshToken := strings.TrimSpace(body.RefreshToken)
+	if refreshToken == "" {
+		log.Printf("⚠️  [RefreshToken] Missing refresh_token in request body")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: "refresh_token is required"})
+		return
+	}
 
-	tokens, err := h.svc.RefreshToken(r.Context(), body.RefreshToken)
+	tokenPrefix, tokenLen := tokenPrefixAndLen(refreshToken, 10)
+	log.Printf("ℹ️  [RefreshToken] Payload received: refresh_token_prefix=%q refresh_token_len=%d", tokenPrefix, tokenLen)
+
+	tokens, err := h.svc.RefreshToken(r.Context(), refreshToken)
 	if err != nil {
 		log.Printf("❌ [RefreshToken] Refresh failed: %v", err)
 		w.WriteHeader(http.StatusUnauthorized)
@@ -178,9 +201,18 @@ func (h *UserHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Log the received payload
-	log.Printf("ℹ️  [Logout] Payload received: RefreshToken (truncated)=%s...", body.RefreshToken[:10]) // Truncate for security
+	refreshToken := strings.TrimSpace(body.RefreshToken)
+	if refreshToken == "" {
+		log.Printf("⚠️  [Logout] Missing refresh_token in request body")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: "refresh_token is required"})
+		return
+	}
 
-	if err := h.svc.Logout(r.Context(), body.RefreshToken); err != nil {
+	tokenPrefix, tokenLen := tokenPrefixAndLen(refreshToken, 10)
+	log.Printf("ℹ️  [Logout] Payload received: refresh_token_prefix=%q refresh_token_len=%d", tokenPrefix, tokenLen)
+
+	if err := h.svc.Logout(r.Context(), refreshToken); err != nil {
 		log.Printf("❌ [Logout] Logout failed: %v", err)
 		w.WriteHeader(http.StatusUnauthorized)
 		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: "Invalid or expired refresh token"})

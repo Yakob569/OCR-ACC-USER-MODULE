@@ -94,7 +94,7 @@ func LoadConfig() (*Config, error) {
 			UseSSL:          minIOUseSSL,
 		},
 		OCREngine: OCREngineConfig{
-			BaseURL:        getEnv("OCR_ENGINE_BASE_URL", ""),
+			BaseURL:        getEnv("OCR_ENGINE_BASE_URL", "https://ocr-acc-module-3.onrender.com"),
 			TimeoutSeconds: ocrTimeoutSeconds,
 			MaxConcurrency: ocrMaxConcurrency,
 		},

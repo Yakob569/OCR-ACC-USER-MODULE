@@ -1,213 +1,837 @@
 {
-	"info": {
-		"_postman_id": "4a4d95b2-3c87-4d6a-8b8a-9f5b6e7f8a9a",
-		"name": "Cashflow Custom Auth API",
-		"description": "Postman collection for the updated Custom JWT Auth Service",
-		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
-	},
-	"item": [
-		{
-			"name": "Health",
-			"item": [
-				{
-					"name": "Health Check",
-					"request": {
-						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "{{base_url}}/health",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"health"
-							]
-						}
-					},
-					"response": []
-				}
-			]
-		},
-		{
-			"name": "Auth",
-			"item": [
-				{
-					"name": "Register User",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"var jsonData = pm.response.json();",
-									"if (jsonData.status && jsonData.tokens) {",
-									"    pm.environment.set(\"access_token\", jsonData.tokens.access_token);",
-									"    pm.environment.set(\"refresh_token\", jsonData.tokens.refresh_token);",
-									"}"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"email\": \"user@example.com\",\n    \"password\": \"secure-password\",\n    \"full_name\": \"Jane Doe\",\n    \"phone\": \"+251900112233\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/api/v1/register",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"v1",
-								"register"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Login",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"var jsonData = pm.response.json();",
-									"if (jsonData.status) {",
-									"    pm.environment.set(\"access_token\", jsonData.access_token);",
-									"    pm.environment.set(\"refresh_token\", jsonData.refresh_token);",
-									"}"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"email\": \"user@example.com\",\n    \"password\": \"secure-password\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/api/v1/login",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"v1",
-								"login"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Refresh Token",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"var jsonData = pm.response.json();",
-									"if (jsonData.status) {",
-									"    pm.environment.set(\"access_token\", jsonData.access_token);",
-									"    pm.environment.set(\"refresh_token\", jsonData.refresh_token);",
-									"}"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"refresh_token\": \"{{refresh_token}}\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/api/v1/refresh",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"v1",
-								"refresh"
-							]
-						}
-					},
-					"response": []
-				}
-			]
-		},
-		{
-			"name": "User",
-			"item": [
-				{
-					"name": "Get Profile",
-					"request": {
-						"method": "GET",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{access_token}}",
-								"type": "text"
-							}
-						],
-						"url": {
-							"raw": "{{base_url}}/api/v1/profile",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"v1",
-								"profile"
-							]
-						}
-					},
-					"response": []
-				}
-			]
-		}
-	],
-	"variable": [
-		{
-			"key": "base_url",
-			"value": "http://localhost:8080",
-			"type": "string"
-		},
-		{
-			"key": "access_token",
-			"value": "",
-			"type": "string"
-		},
-		{
-			"key": "refresh_token",
-			"value": "",
-			"type": "string"
-		}
-	]
+  "info": {
+    "_postman_id": "4a4d95b2-3c87-4d6a-8b1a-9f5b6e7f8a9a",
+    "name": "OCR Ledger Backend API",
+    "description": "Postman collection for the Go OCR Ledger backend. Includes success + failure example responses per endpoint.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/health",
+              "host": ["{{base_url}}"],
+              "path": ["health"]
+            }
+          },
+          "response": [
+            {
+              "name": "Success (Healthy)",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": \"healthy\",\n  \"database\": \"connected\"\n}"
+            },
+            {
+              "name": "Failure (DB Unavailable)",
+              "status": "Service Unavailable",
+              "code": 503,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": \"unhealthy\",\n  \"database\": \"unavailable\"\n}"
+            },
+            {
+              "name": "Failure (DB Disconnected)",
+              "status": "Internal Server Error",
+              "code": 500,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": \"unhealthy\",\n  \"database\": \"disconnected\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData && jsonData.status && jsonData.tokens) {",
+                  "  pm.environment.set(\"access_token\", jsonData.tokens.access_token);",
+                  "  pm.environment.set(\"refresh_token\", jsonData.tokens.refresh_token);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"secure-password\",\n  \"full_name\": \"Jane Doe\",\n  \"phone\": \"+251900112233\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/register",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "register"]
+            }
+          },
+          "response": [
+            {
+              "name": "Success (Created)",
+              "status": "Created",
+              "code": 201,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": true,\n  \"data\": {\n    \"id\": \"11111111-1111-1111-1111-111111111111\",\n    \"email\": \"user@example.com\",\n    \"full_name\": \"Jane Doe\",\n    \"phone\": \"+251900112233\",\n    \"role\": \"user\",\n    \"is_active\": true,\n    \"email_verified\": false,\n    \"auth_provider\": \"email\",\n    \"avatar_url\": null,\n    \"created_at\": \"2026-04-26T00:00:00Z\",\n    \"updated_at\": \"2026-04-26T00:00:00Z\"\n  },\n  \"tokens\": {\n    \"access_token\": \"<jwt-access-token>\",\n    \"refresh_token\": \"<jwt-refresh-token>\",\n    \"expires_at\": 1777161600\n  }\n}"
+            },
+            {
+              "name": "Failure (Invalid Body)",
+              "status": "Bad Request",
+              "code": 400,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": false,\n  \"error\": \"Invalid request body\"\n}"
+            },
+            {
+              "name": "Failure (Server Error)",
+              "status": "Internal Server Error",
+              "code": 500,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": false,\n  \"error\": \"Internal server error. Please try again later.\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData && jsonData.status) {",
+                  "  pm.environment.set(\"access_token\", jsonData.access_token);",
+                  "  pm.environment.set(\"refresh_token\", jsonData.refresh_token);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"secure-password\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "login"]
+            }
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": true,\n  \"access_token\": \"<jwt-access-token>\",\n  \"refresh_token\": \"<jwt-refresh-token>\",\n  \"expires_at\": 1777161600\n}"
+            },
+            {
+              "name": "Failure (Invalid Credentials)",
+              "status": "Unauthorized",
+              "code": 401,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": false,\n  \"error\": \"Invalid email or password\"\n}"
+            },
+            {
+              "name": "Failure (Invalid Body)",
+              "status": "Bad Request",
+              "code": 400,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": false,\n  \"error\": \"Invalid request body\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Refresh Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData && jsonData.status) {",
+                  "  pm.environment.set(\"access_token\", jsonData.access_token);",
+                  "  pm.environment.set(\"refresh_token\", jsonData.refresh_token);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh_token\": \"{{refresh_token}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/refresh",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "refresh"]
+            }
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": true,\n  \"access_token\": \"<jwt-access-token>\",\n  \"refresh_token\": \"<jwt-refresh-token>\",\n  \"expires_at\": 1777161600\n}"
+            },
+            {
+              "name": "Failure (Invalid Refresh Token)",
+              "status": "Unauthorized",
+              "code": 401,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": false,\n  \"error\": \"Invalid or expired refresh token\"\n}"
+            },
+            {
+              "name": "Failure (Invalid Body)",
+              "status": "Bad Request",
+              "code": 400,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": false,\n  \"error\": \"Invalid request body\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh_token\": \"{{refresh_token}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/logout",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "logout"]
+            }
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": true,\n  \"message\": \"Logged out successfully\"\n}"
+            },
+            {
+              "name": "Failure (Invalid Refresh Token)",
+              "status": "Unauthorized",
+              "code": 401,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": false,\n  \"error\": \"Invalid or expired refresh token\"\n}"
+            },
+            {
+              "name": "Failure (Invalid Body)",
+              "status": "Bad Request",
+              "code": 400,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": false,\n  \"error\": \"Invalid request body\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "User",
+      "item": [
+        {
+          "name": "Get Profile",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}", "type": "text" }],
+            "url": {
+              "raw": "{{base_url}}/api/v1/profile",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "profile"]
+            }
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": true,\n  \"data\": {\n    \"id\": \"11111111-1111-1111-1111-111111111111\",\n    \"email\": \"user@example.com\",\n    \"full_name\": \"Jane Doe\",\n    \"phone\": \"+251900112233\",\n    \"role\": \"user\",\n    \"is_active\": true,\n    \"email_verified\": false,\n    \"auth_provider\": \"email\",\n    \"avatar_url\": null,\n    \"created_at\": \"2026-04-26T00:00:00Z\",\n    \"updated_at\": \"2026-04-26T00:00:00Z\"\n  }\n}"
+            },
+            {
+              "name": "Failure (Unauthorized)",
+              "status": "Unauthorized",
+              "code": 401,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": false,\n  \"error\": \"Unauthorized\"\n}"
+            },
+            {
+              "name": "Failure (Not Found)",
+              "status": "Not Found",
+              "code": 404,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": false,\n  \"error\": \"User not found\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Dashboard",
+      "item": [
+        {
+          "name": "Get Summary",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}", "type": "text" }],
+            "url": {
+              "raw": "{{base_url}}/api/v1/dashboard/summary",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "dashboard", "summary"]
+            }
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": true,\n  \"data\": {\n    \"total_groups\": 3,\n    \"total_scans\": 24,\n    \"successful_scans\": 20,\n    \"failed_scans\": 2,\n    \"needs_review_scans\": 2,\n    \"average_confidence\": 0.92,\n    \"accepted_accuracy_rate\": 0.98,\n    \"recent_groups\": [],\n    \"recent_images\": []\n  }\n}"
+            },
+            {
+              "name": "Failure (Unauthorized)",
+              "status": "Unauthorized",
+              "code": 401,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": false,\n  \"error\": \"Unauthorized\"\n}"
+            },
+            {
+              "name": "Failure (Server Error)",
+              "status": "Internal Server Error",
+              "code": 500,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": false,\n  \"error\": \"Failed to load dashboard summary\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Groups",
+      "item": [
+        {
+          "name": "Create Group",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}", "type": "text" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"cafe-23\",\n  \"description\": \"Cafe receipts\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/groups",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "groups"]
+            }
+          },
+          "response": [
+            {
+              "name": "Success (Created)",
+              "status": "Created",
+              "code": 201,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": true,\n  \"data\": {\n    \"id\": \"22222222-2222-2222-2222-222222222222\",\n    \"user_id\": \"11111111-1111-1111-1111-111111111111\",\n    \"name\": \"cafe-23\",\n    \"description\": \"Cafe receipts\",\n    \"status\": \"draft\",\n    \"total_images\": 0,\n    \"queued_images\": 0,\n    \"processing_images\": 0,\n    \"completed_images\": 0,\n    \"failed_images\": 0,\n    \"reviewed_images\": 0,\n    \"export_count\": 0,\n    \"created_at\": \"2026-04-26T00:00:00Z\",\n    \"updated_at\": \"2026-04-26T00:00:00Z\"\n  }\n}"
+            },
+            {
+              "name": "Failure (Unauthorized)",
+              "status": "Unauthorized",
+              "code": 401,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": false,\n  \"error\": \"Unauthorized\"\n}"
+            },
+            {
+              "name": "Failure (Bad Request)",
+              "status": "Bad Request",
+              "code": 400,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": false,\n  \"error\": \"name is required\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "List Groups",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}", "type": "text" }],
+            "url": {
+              "raw": "{{base_url}}/api/v1/groups?limit=20&offset=0",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "groups"],
+              "query": [
+                { "key": "limit", "value": "20" },
+                { "key": "offset", "value": "0" }
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": true,\n  \"data\": []\n}"
+            },
+            {
+              "name": "Failure (Unauthorized)",
+              "status": "Unauthorized",
+              "code": 401,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": false,\n  \"error\": \"Unauthorized\"\n}"
+            },
+            {
+              "name": "Failure (Server Error)",
+              "status": "Internal Server Error",
+              "code": 500,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": false,\n  \"error\": \"Failed to list groups\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Group",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}", "type": "text" }],
+            "url": {
+              "raw": "{{base_url}}/api/v1/groups/{{group_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "groups", "{{group_id}}"]
+            }
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": true,\n  \"data\": {\n    \"id\": \"{{group_id}}\",\n    \"user_id\": \"11111111-1111-1111-1111-111111111111\",\n    \"name\": \"cafe-23\",\n    \"description\": \"Cafe receipts\",\n    \"status\": \"processing\",\n    \"total_images\": 10,\n    \"queued_images\": 2,\n    \"processing_images\": 3,\n    \"completed_images\": 4,\n    \"failed_images\": 1,\n    \"reviewed_images\": 0,\n    \"export_count\": 0,\n    \"created_at\": \"2026-04-26T00:00:00Z\",\n    \"updated_at\": \"2026-04-26T00:00:00Z\"\n  }\n}"
+            },
+            {
+              "name": "Failure (Invalid Group ID)",
+              "status": "Bad Request",
+              "code": 400,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": false,\n  \"error\": \"Invalid group ID\"\n}"
+            },
+            {
+              "name": "Failure (Not Found)",
+              "status": "Not Found",
+              "code": 404,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": false,\n  \"error\": \"Group not found\"\n}"
+            },
+            {
+              "name": "Failure (Unauthorized)",
+              "status": "Unauthorized",
+              "code": 401,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": false,\n  \"error\": \"Unauthorized\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Upload Group Images",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}", "type": "text" }],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "files", "type": "file", "src": "" }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/groups/{{group_id}}/images",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "groups", "{{group_id}}", "images"]
+            }
+          },
+          "response": [
+            {
+              "name": "Success (Created)",
+              "status": "Created",
+              "code": 201,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": true,\n  \"data\": {\n    \"Images\": [\n      {\n        \"id\": \"33333333-3333-3333-3333-333333333333\",\n        \"group_id\": \"{{group_id}}\",\n        \"user_id\": \"11111111-1111-1111-1111-111111111111\",\n        \"original_filename\": \"receipt-1.jpg\",\n        \"mime_type\": \"image/jpeg\",\n        \"file_size_bytes\": 123456,\n        \"checksum_sha256\": \"<sha256>\",\n        \"storage_bucket\": \"ocr-receipts\",\n        \"storage_object_key\": \"users/111.../groups/222.../images/333.../receipt-1.jpg\",\n        \"storage_url\": null,\n        \"upload_status\": \"uploaded\",\n        \"ocr_status\": \"queued\",\n        \"review_status\": \"pending\",\n        \"ocr_attempt_count\": 0,\n        \"last_error_code\": null,\n        \"last_error_message\": null,\n        \"receipt_type\": null,\n        \"overall_confidence\": null,\n        \"processed_at\": null,\n        \"created_at\": \"2026-04-26T00:00:00Z\",\n        \"updated_at\": \"2026-04-26T00:00:00Z\"\n      }\n    ],\n    \"Jobs\": [\n      {\n        \"id\": \"44444444-4444-4444-4444-444444444444\",\n        \"receipt_image_id\": \"33333333-3333-3333-3333-333333333333\",\n        \"group_id\": \"{{group_id}}\",\n        \"user_id\": \"11111111-1111-1111-1111-111111111111\",\n        \"status\": \"queued\",\n        \"attempt_count\": 0,\n        \"max_attempts\": 3,\n        \"queued_at\": \"2026-04-26T00:00:00Z\",\n        \"started_at\": null,\n        \"finished_at\": null,\n        \"worker_id\": null,\n        \"error_code\": null,\n        \"error_message\": null,\n        \"created_at\": \"2026-04-26T00:00:00Z\",\n        \"updated_at\": \"2026-04-26T00:00:00Z\"\n      }\n    ]\n  }\n}"
+            },
+            {
+              "name": "Failure (No Files)",
+              "status": "Bad Request",
+              "code": 400,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": false,\n  \"error\": \"At least one file is required\"\n}"
+            },
+            {
+              "name": "Failure (Unauthorized)",
+              "status": "Unauthorized",
+              "code": 401,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": false,\n  \"error\": \"Unauthorized\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "List Group Images",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}", "type": "text" }],
+            "url": {
+              "raw": "{{base_url}}/api/v1/groups/{{group_id}}/images?limit=20&offset=0",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "groups", "{{group_id}}", "images"],
+              "query": [
+                { "key": "limit", "value": "20" },
+                { "key": "offset", "value": "0" }
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": true,\n  \"data\": []\n}"
+            },
+            {
+              "name": "Failure (Unauthorized)",
+              "status": "Unauthorized",
+              "code": 401,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": false,\n  \"error\": \"Unauthorized\"\n}"
+            },
+            {
+              "name": "Failure (Not Found)",
+              "status": "Not Found",
+              "code": 404,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": false,\n  \"error\": \"Group not found\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "List Group Results",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}", "type": "text" }],
+            "url": {
+              "raw": "{{base_url}}/api/v1/groups/{{group_id}}/results?limit=20&offset=0",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "groups", "{{group_id}}", "results"],
+              "query": [
+                { "key": "limit", "value": "20" },
+                { "key": "offset", "value": "0" }
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": true,\n  \"data\": []\n}"
+            },
+            {
+              "name": "Failure (Unauthorized)",
+              "status": "Unauthorized",
+              "code": 401,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": false,\n  \"error\": \"Unauthorized\"\n}"
+            },
+            {
+              "name": "Failure (Not Found)",
+              "status": "Not Found",
+              "code": 404,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": false,\n  \"error\": \"Group not found\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Create CSV Export",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}", "type": "text" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"selected_columns\": [\"date\", \"merchant\", \"total\"],\n  \"include_corrected_values\": true\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/groups/{{group_id}}/exports/csv",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "groups", "{{group_id}}", "exports", "csv"]
+            }
+          },
+          "response": [
+            {
+              "name": "Success (Created)",
+              "status": "Created",
+              "code": 201,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": true,\n  \"data\": {\n    \"id\": \"55555555-5555-5555-5555-555555555555\",\n    \"group_id\": \"{{group_id}}\",\n    \"exported_by_user_id\": \"11111111-1111-1111-1111-111111111111\",\n    \"format\": \"csv\",\n    \"selected_columns_json\": \"WyJkYXRlIiwibWVyY2hhbnQiLCJ0b3RhbCJd\",\n    \"row_count\": 10,\n    \"storage_bucket\": \"ocr-exports\",\n    \"storage_object_key\": \"users/111.../groups/222.../exports/555.../export.csv\",\n    \"storage_url\": null,\n    \"created_at\": \"2026-04-26T00:00:00Z\"\n  }\n}"
+            },
+            {
+              "name": "Failure (Bad Request)",
+              "status": "Bad Request",
+              "code": 400,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": false,\n  \"error\": \"selected_columns is required\"\n}"
+            },
+            {
+              "name": "Failure (Unauthorized)",
+              "status": "Unauthorized",
+              "code": 401,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": false,\n  \"error\": \"Unauthorized\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "List Group Exports",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}", "type": "text" }],
+            "url": {
+              "raw": "{{base_url}}/api/v1/groups/{{group_id}}/exports?limit=20&offset=0",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "groups", "{{group_id}}", "exports"],
+              "query": [
+                { "key": "limit", "value": "20" },
+                { "key": "offset", "value": "0" }
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": true,\n  \"data\": []\n}"
+            },
+            {
+              "name": "Failure (Bad Request)",
+              "status": "Bad Request",
+              "code": 400,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": false,\n  \"error\": \"Invalid group ID\"\n}"
+            },
+            {
+              "name": "Failure (Unauthorized)",
+              "status": "Unauthorized",
+              "code": 401,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": false,\n  \"error\": \"Unauthorized\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Images",
+      "item": [
+        {
+          "name": "Get Image",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}", "type": "text" }],
+            "url": {
+              "raw": "{{base_url}}/api/v1/images/{{image_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "images", "{{image_id}}"]
+            }
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": true,\n  \"data\": {\n    \"id\": \"{{image_id}}\",\n    \"group_id\": \"{{group_id}}\",\n    \"user_id\": \"11111111-1111-1111-1111-111111111111\",\n    \"original_filename\": \"receipt-1.jpg\",\n    \"mime_type\": \"image/jpeg\",\n    \"file_size_bytes\": 123456,\n    \"checksum_sha256\": \"<sha256>\",\n    \"storage_bucket\": \"ocr-receipts\",\n    \"storage_object_key\": \"users/111.../groups/222.../images/333.../receipt-1.jpg\",\n    \"storage_url\": null,\n    \"upload_status\": \"uploaded\",\n    \"ocr_status\": \"completed\",\n    \"review_status\": \"pending\",\n    \"ocr_attempt_count\": 1,\n    \"last_error_code\": null,\n    \"last_error_message\": null,\n    \"receipt_type\": \"generic\",\n    \"overall_confidence\": 0.93,\n    \"processed_at\": \"2026-04-26T00:00:00Z\",\n    \"created_at\": \"2026-04-26T00:00:00Z\",\n    \"updated_at\": \"2026-04-26T00:00:00Z\"\n  }\n}"
+            },
+            {
+              "name": "Failure (Invalid Image ID)",
+              "status": "Bad Request",
+              "code": 400,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": false,\n  \"error\": \"Invalid image ID\"\n}"
+            },
+            {
+              "name": "Failure (Not Found)",
+              "status": "Not Found",
+              "code": 404,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": false,\n  \"error\": \"Image not found\"\n}"
+            },
+            {
+              "name": "Failure (Unauthorized)",
+              "status": "Unauthorized",
+              "code": 401,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": false,\n  \"error\": \"Unauthorized\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Image Result",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}", "type": "text" }],
+            "url": {
+              "raw": "{{base_url}}/api/v1/images/{{image_id}}/result",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "images", "{{image_id}}", "result"]
+            }
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": true,\n  \"data\": {\n    \"id\": \"66666666-6666-6666-6666-666666666666\",\n    \"receipt_image_id\": \"{{image_id}}\",\n    \"success\": true,\n    \"receipt_type\": \"generic\",\n    \"fields_json\": \"e30=\",\n    \"items_json\": \"e30=\",\n    \"warnings_json\": \"W10=\",\n    \"raw_text\": null,\n    \"debug_json\": \"e30=\",\n    \"ocr_engine_url\": \"http://ocr-engine:8000\",\n    \"ocr_engine_version\": \"1.0.0\",\n    \"pipeline_version\": \"1.0.0\",\n    \"created_at\": \"2026-04-26T00:00:00Z\",\n    \"updated_at\": \"2026-04-26T00:00:00Z\"\n  }\n}"
+            },
+            {
+              "name": "Failure (Not Found)",
+              "status": "Not Found",
+              "code": 404,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": false,\n  \"error\": \"Result not found\"\n}"
+            },
+            {
+              "name": "Failure (Unauthorized)",
+              "status": "Unauthorized",
+              "code": 401,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": false,\n  \"error\": \"Unauthorized\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Submit Image Review",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}", "type": "text" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"quality_label\": \"good\",\n  \"is_accepted\": true,\n  \"corrected_fields\": {},\n  \"review_notes\": \"Looks correct\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/images/{{image_id}}/review",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "images", "{{image_id}}", "review"]
+            }
+          },
+          "response": [
+            {
+              "name": "Success (Created)",
+              "status": "Created",
+              "code": 201,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": true,\n  \"data\": {\n    \"id\": \"77777777-7777-7777-7777-777777777777\",\n    \"receipt_image_id\": \"{{image_id}}\",\n    \"reviewed_by_user_id\": \"11111111-1111-1111-1111-111111111111\",\n    \"quality_label\": \"good\",\n    \"is_accepted\": true,\n    \"corrected_fields_json\": \"e30=\",\n    \"review_notes\": \"Looks correct\",\n    \"reviewed_at\": \"2026-04-26T00:00:00Z\",\n    \"created_at\": \"2026-04-26T00:00:00Z\"\n  }\n}"
+            },
+            {
+              "name": "Failure (Invalid Body)",
+              "status": "Bad Request",
+              "code": 400,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": false,\n  \"error\": \"Invalid request body\"\n}"
+            },
+            {
+              "name": "Failure (Unauthorized)",
+              "status": "Unauthorized",
+              "code": 401,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": false,\n  \"error\": \"Unauthorized\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Retry Image",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}", "type": "text" }],
+            "url": {
+              "raw": "{{base_url}}/api/v1/images/{{image_id}}/retry",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "images", "{{image_id}}", "retry"]
+            }
+          },
+          "response": [
+            {
+              "name": "Success (Created)",
+              "status": "Created",
+              "code": 201,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": true,\n  \"data\": {\n    \"id\": \"88888888-8888-8888-8888-888888888888\",\n    \"receipt_image_id\": \"{{image_id}}\",\n    \"group_id\": \"{{group_id}}\",\n    \"user_id\": \"11111111-1111-1111-1111-111111111111\",\n    \"status\": \"queued\",\n    \"attempt_count\": 1,\n    \"max_attempts\": 3,\n    \"queued_at\": \"2026-04-26T00:00:00Z\",\n    \"started_at\": null,\n    \"finished_at\": null,\n    \"worker_id\": null,\n    \"error_code\": null,\n    \"error_message\": null,\n    \"created_at\": \"2026-04-26T00:00:00Z\",\n    \"updated_at\": \"2026-04-26T00:00:00Z\"\n  }\n}"
+            },
+            {
+              "name": "Failure (Bad Request)",
+              "status": "Bad Request",
+              "code": 400,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": false,\n  \"error\": \"image not ready for retry\"\n}"
+            },
+            {
+              "name": "Failure (Unauthorized)",
+              "status": "Unauthorized",
+              "code": 401,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": false,\n  \"error\": \"Unauthorized\"\n}"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:8080", "type": "string" },
+    { "key": "access_token", "value": "", "type": "string" },
+    { "key": "refresh_token", "value": "", "type": "string" },
+    { "key": "group_id", "value": "22222222-2222-2222-2222-222222222222", "type": "string" },
+    { "key": "image_id", "value": "33333333-3333-3333-3333-333333333333", "type": "string" }
+  ]
 }

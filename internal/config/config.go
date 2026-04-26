@@ -86,11 +86,11 @@ func LoadConfig() (*Config, error) {
 		SupabaseKey:        getEnv("SUPABASE_KEY", ""),
 		SupabaseProjectRef: getEnv("SUPABASE_PROJECT_REF", ""),
 		MinIO: MinIOConfig{
-			AccessKeyID:     getEnv("MINIO_ACCESS_KEY_ID", ""),
-			SecretAccessKey: getEnv("MINIO_SECRET_ACCESS_KEY", ""),
+			AccessKeyID:     getEnv("MINIO_ACCESS_KEY_ID", "DEg0h6SfVoMEYTxJCxbY"),
+			SecretAccessKey: getEnv("MINIO_SECRET_ACCESS_KEY", "CYUQ1PrjTfxgG9kMU8oCoqgpOQ8SAeCcalOByFpv"),
 			BucketName:      getEnv("MINIO_BUCKET_NAME", "dev"),
-			Endpoint:        getEnv("MINIO_END_POINT", ""),
-			CLAMAVURL:       getEnv("MINIO_CLAMAV_URL", ""),
+			Endpoint:        getEnv("MINIO_END_POINT", "minio-cli.addispay.et"),
+			CLAMAVURL:       getEnv("MINIO_CLAMAV_URL", "ttps://filescan.addispay.et/api/v1/scan"),
 			UseSSL:          minIOUseSSL,
 		},
 		OCREngine: OCREngineConfig{

@@ -1,0 +1,23 @@
+name: Health Check
+
+on:
+  schedule:
+    # Runs every 5 minutes
+    - cron: '*/5 * * * *'
+
+jobs:
+  check-health:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check application health
+        run: |
+          HEALTH_URL="https://ocr-acc-user-module.onrender.com/health"
+          echo "Checking health of $HEALTH_URL..."
+          curl -f $HEALTH_URL
+          if [ $? -eq 0 ]; then
+            echo "Health check passed for $HEALTH_URL"
+          else
+            echo "Health check failed for $HEALTH_URL"
+            exit 1
+          fi

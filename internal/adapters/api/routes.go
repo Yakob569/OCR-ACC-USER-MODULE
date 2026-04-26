@@ -53,6 +53,14 @@ func (s *Server) RegisterRoutes() http.Handler {
 			s.groupHandler.GetImageResult(w, r)
 			return
 		}
+		if strings.HasSuffix(r.URL.Path, "/review") {
+			s.groupHandler.SubmitImageReview(w, r)
+			return
+		}
+		if strings.HasSuffix(r.URL.Path, "/retry") {
+			s.groupHandler.RetryImage(w, r)
+			return
+		}
 		s.groupHandler.GetImage(w, r)
 	})
 

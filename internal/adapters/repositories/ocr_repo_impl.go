@@ -32,6 +32,10 @@ type dashboardRepo struct {
 	db *pgxpool.Pool
 }
 
+type receiptReviewRepo struct {
+	db *pgxpool.Pool
+}
+
 func NewReceiptGroupRepository(db *pgxpool.Pool) ports.ReceiptGroupRepository {
 	return &receiptGroupRepo{db: db}
 }
@@ -50,6 +54,10 @@ func NewOCRJobRepository(db *pgxpool.Pool) ports.OCRJobRepository {
 
 func NewDashboardRepository(db *pgxpool.Pool) ports.DashboardRepository {
 	return &dashboardRepo{db: db}
+}
+
+func NewReceiptReviewRepository(db *pgxpool.Pool) ports.ReceiptReviewRepository {
+	return &receiptReviewRepo{db: db}
 }
 
 func (r *receiptGroupRepo) Create(ctx context.Context, input domain.CreateReceiptGroupInput) (*domain.ReceiptGroup, error) {
@@ -903,6 +911,7 @@ var _ ports.ReceiptImageRepository = (*receiptImageRepo)(nil)
 var _ ports.OCRExtractionRepository = (*ocrExtractionRepo)(nil)
 var _ ports.OCRJobRepository = (*ocrJobRepo)(nil)
 var _ ports.DashboardRepository = (*dashboardRepo)(nil)
+var _ ports.ReceiptReviewRepository = (*receiptReviewRepo)(nil)
 
 func (r *dashboardRepo) GetSummary(ctx context.Context, userID uuid.UUID) (*domain.DashboardSummary, error) {
 	if r.db == nil {
@@ -1007,4 +1016,79 @@ func (r *dashboardRepo) GetSummary(ctx context.Context, userID uuid.UUID) (*doma
 	}
 
 	return summary, nil
+}
+
+func (r *receiptReviewRepo) Create(ctx context.Context, input domain.SubmitReceiptReviewInput) (*domain.ReceiptReview, error) {
+	if r.db == nil {
+		return nil, errors.New("database connection is not available")
+	}
+
+	query := `
+		INSERT INTO receipt_reviews (
+			receipt_image_id, reviewed_by_user_id, quality_label, is_accepted, corrected_fields_json, review_notes
+		)
+		VALUES ($1, $2, $3, $4, $5, NULLIF($6, ''))
+		RETURNING id, receipt_image_id, reviewed_by_user_id, quality_label, is_accepted,
+		          corrected_fields_json, review_notes, reviewed_at, created_at
+	`
+
+	var review domain.ReceiptReview
+	var notes pgtype.Text
+	err := r.db.QueryRow(ctx, query,
+		input.ReceiptImageID,
+		input.ReviewedByUserID,
+		input.QualityLabel,
+		input.IsAccepted,
+		input.CorrectedFieldsJSON,
+		input.ReviewNotes,
+	).Scan(
+		&review.ID,
+		&review.ReceiptImageID,
+		&review.ReviewedByUserID,
+		&review.QualityLabel,
+		&review.IsAccepted,
+		&review.CorrectedFieldsJSON,
+		&notes,
+		&review.ReviewedAt,
+		&review.CreatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	review.ReviewNotes = nullableText(notes)
+	return &review, nil
+}
+
+func (r *receiptReviewRepo) GetByReceiptImageID(ctx context.Context, receiptImageID uuid.UUID) (*domain.ReceiptReview, error) {
+	if r.db == nil {
+		return nil, errors.New("database connection is not available")
+	}
+
+	query := `
+		SELECT id, receipt_image_id, reviewed_by_user_id, quality_label, is_accepted,
+		       corrected_fields_json, review_notes, reviewed_at, created_at
+		FROM receipt_reviews
+		WHERE receipt_image_id = $1
+		ORDER BY created_at DESC
+		LIMIT 1
+	`
+
+	var review domain.ReceiptReview
+	var notes pgtype.Text
+	err := r.db.QueryRow(ctx, query, receiptImageID).Scan(
+		&review.ID,
+		&review.ReceiptImageID,
+		&review.ReviewedByUserID,
+		&review.QualityLabel,
+		&review.IsAccepted,
+		&review.CorrectedFieldsJSON,
+		&notes,
+		&review.ReviewedAt,
+		&review.CreatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	review.ReviewNotes = nullableText(notes)
+	return &review, nil
 }

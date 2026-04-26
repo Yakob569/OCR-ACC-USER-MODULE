@@ -81,6 +81,19 @@ type ReceiptQueryService interface {
 	ListGroupResults(ctx context.Context, userID, groupID uuid.UUID, limit, offset int) ([]domain.OCRExtraction, error)
 }
 
+type ReceiptReviewRepository interface {
+	Create(ctx context.Context, input domain.SubmitReceiptReviewInput) (*domain.ReceiptReview, error)
+	GetByReceiptImageID(ctx context.Context, receiptImageID uuid.UUID) (*domain.ReceiptReview, error)
+}
+
+type ReceiptReviewService interface {
+	SubmitReview(ctx context.Context, input domain.SubmitReceiptReviewInput) (*domain.ReceiptReview, error)
+}
+
+type OCRRetryService interface {
+	RetryImage(ctx context.Context, userID, imageID uuid.UUID) (*domain.OCRJob, error)
+}
+
 type ReceiptFile struct {
 	Filename      string
 	ContentType   string

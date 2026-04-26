@@ -115,6 +115,18 @@ type OCRJob struct {
 	UpdatedAt      time.Time  `json:"updated_at"`
 }
 
+type ReceiptReview struct {
+	ID                  uuid.UUID `json:"id"`
+	ReceiptImageID      uuid.UUID `json:"receipt_image_id"`
+	ReviewedByUserID    uuid.UUID `json:"reviewed_by_user_id"`
+	QualityLabel        string    `json:"quality_label"`
+	IsAccepted          bool      `json:"is_accepted"`
+	CorrectedFieldsJSON []byte    `json:"corrected_fields_json"`
+	ReviewNotes         *string   `json:"review_notes"`
+	ReviewedAt          time.Time `json:"reviewed_at"`
+	CreatedAt           time.Time `json:"created_at"`
+}
+
 type DashboardSummary struct {
 	TotalGroups          int            `json:"total_groups"`
 	TotalScans           int            `json:"total_scans"`
@@ -151,4 +163,13 @@ type OCRProcessResult struct {
 	OCRStatus   string
 	ReceiptType *string
 	Confidence  *float64
+}
+
+type SubmitReceiptReviewInput struct {
+	ReceiptImageID      uuid.UUID
+	ReviewedByUserID    uuid.UUID
+	QualityLabel        string
+	IsAccepted          bool
+	CorrectedFieldsJSON []byte
+	ReviewNotes         string
 }

@@ -1,5 +1,7 @@
 package handlers
 
+import "encoding/json"
+
 type RegisterRequest struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
@@ -54,4 +56,11 @@ type MessageResponse struct {
 type CreateGroupRequest struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
+}
+
+type SubmitReviewRequest struct {
+	QualityLabel    string          `json:"quality_label"`
+	IsAccepted      bool            `json:"is_accepted"`
+	CorrectedFields json.RawMessage `json:"corrected_fields"`
+	ReviewNotes     string          `json:"review_notes"`
 }

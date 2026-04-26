@@ -18,10 +18,12 @@ type GroupHandler struct {
 	svc       ports.ReceiptGroupService
 	uploadSvc ports.ReceiptUploadService
 	querySvc  ports.ReceiptQueryService
+	reviewSvc ports.ReceiptReviewService
+	retrySvc  ports.OCRRetryService
 }
 
-func NewGroupHandler(svc ports.ReceiptGroupService, uploadSvc ports.ReceiptUploadService, querySvc ports.ReceiptQueryService) *GroupHandler {
-	return &GroupHandler{svc: svc, uploadSvc: uploadSvc, querySvc: querySvc}
+func NewGroupHandler(svc ports.ReceiptGroupService, uploadSvc ports.ReceiptUploadService, querySvc ports.ReceiptQueryService, reviewSvc ports.ReceiptReviewService, retrySvc ports.OCRRetryService) *GroupHandler {
+	return &GroupHandler{svc: svc, uploadSvc: uploadSvc, querySvc: querySvc, reviewSvc: reviewSvc, retrySvc: retrySvc}
 }
 
 func (h *GroupHandler) CreateGroup(w http.ResponseWriter, r *http.Request) {
@@ -340,6 +342,92 @@ func (h *GroupHandler) GetImageResult(w http.ResponseWriter, r *http.Request) {
 		Status bool                  `json:"status"`
 		Data   *domain.OCRExtraction `json:"data"`
 	}{Status: true, Data: result})
+}
+
+func (h *GroupHandler) SubmitImageReview(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: "Only POST is allowed"})
+		return
+	}
+
+	userID, ok := requestUserID(r)
+	if !ok {
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: "Unauthorized"})
+		return
+	}
+
+	imageID, err := nestedImageIDFromPath(r.URL.Path, "review")
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: "Invalid image ID"})
+		return
+	}
+
+	var body SubmitReviewRequest
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: "Invalid request body"})
+		return
+	}
+
+	review, err := h.reviewSvc.SubmitReview(r.Context(), domain.SubmitReceiptReviewInput{
+		ReceiptImageID:      imageID,
+		ReviewedByUserID:    userID,
+		QualityLabel:        body.QualityLabel,
+		IsAccepted:          body.IsAccepted,
+		CorrectedFieldsJSON: body.CorrectedFields,
+		ReviewNotes:         body.ReviewNotes,
+	})
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: err.Error()})
+		return
+	}
+
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(struct {
+		Status bool                  `json:"status"`
+		Data   *domain.ReceiptReview `json:"data"`
+	}{Status: true, Data: review})
+}
+
+func (h *GroupHandler) RetryImage(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: "Only POST is allowed"})
+		return
+	}
+
+	userID, ok := requestUserID(r)
+	if !ok {
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: "Unauthorized"})
+		return
+	}
+
+	imageID, err := nestedImageIDFromPath(r.URL.Path, "retry")
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: "Invalid image ID"})
+		return
+	}
+
+	job, err := h.retrySvc.RetryImage(r.Context(), userID, imageID)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: err.Error()})
+		return
+	}
+
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(struct {
+		Status bool           `json:"status"`
+		Data   *domain.OCRJob `json:"data"`
+	}{Status: true, Data: job})
 }
 
 func requestUserID(r *http.Request) (uuid.UUID, bool) {

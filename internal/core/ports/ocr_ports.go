@@ -45,6 +45,7 @@ type OCRJobRepository interface {
 type ObjectStorageService interface {
 	UploadReceiptImage(ctx context.Context, userID, groupID, imageID uuid.UUID, filename, contentType string, content io.Reader, contentLength int64) (bucket string, objectKey string, objectURL *string, err error)
 	DownloadReceiptImage(ctx context.Context, bucket, objectKey string) ([]byte, error)
+	UploadGroupExport(ctx context.Context, userID, groupID, exportID uuid.UUID, content []byte) (bucket string, objectKey string, objectURL *string, err error)
 }
 
 type OCREngineService interface {
@@ -86,12 +87,22 @@ type ReceiptReviewRepository interface {
 	GetByReceiptImageID(ctx context.Context, receiptImageID uuid.UUID) (*domain.ReceiptReview, error)
 }
 
+type GroupExportRepository interface {
+	Create(ctx context.Context, input domain.CreateGroupExportInput) (*domain.GroupExport, error)
+	ListByGroup(ctx context.Context, userID, groupID uuid.UUID, limit, offset int) ([]domain.GroupExport, error)
+}
+
 type ReceiptReviewService interface {
 	SubmitReview(ctx context.Context, input domain.SubmitReceiptReviewInput) (*domain.ReceiptReview, error)
 }
 
 type OCRRetryService interface {
 	RetryImage(ctx context.Context, userID, imageID uuid.UUID) (*domain.OCRJob, error)
+}
+
+type GroupExportService interface {
+	CreateCSVExport(ctx context.Context, userID, groupID uuid.UUID, selectedColumns []string, includeCorrectedValues bool) (*domain.GroupExport, error)
+	ListGroupExports(ctx context.Context, userID, groupID uuid.UUID, limit, offset int) ([]domain.GroupExport, error)
 }
 
 type ReceiptFile struct {

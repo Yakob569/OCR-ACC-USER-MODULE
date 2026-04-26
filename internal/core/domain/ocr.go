@@ -127,6 +127,19 @@ type ReceiptReview struct {
 	CreatedAt           time.Time `json:"created_at"`
 }
 
+type GroupExport struct {
+	ID                  uuid.UUID `json:"id"`
+	GroupID             uuid.UUID `json:"group_id"`
+	ExportedByUserID    uuid.UUID `json:"exported_by_user_id"`
+	Format              string    `json:"format"`
+	SelectedColumnsJSON []byte    `json:"selected_columns_json"`
+	RowCount            int       `json:"row_count"`
+	StorageBucket       *string   `json:"storage_bucket"`
+	StorageObjectKey    *string   `json:"storage_object_key"`
+	StorageURL          *string   `json:"storage_url"`
+	CreatedAt           time.Time `json:"created_at"`
+}
+
 type DashboardSummary struct {
 	TotalGroups          int            `json:"total_groups"`
 	TotalScans           int            `json:"total_scans"`
@@ -172,4 +185,14 @@ type SubmitReceiptReviewInput struct {
 	IsAccepted          bool
 	CorrectedFieldsJSON []byte
 	ReviewNotes         string
+}
+
+type CreateGroupExportInput struct {
+	GroupID             uuid.UUID
+	ExportedByUserID    uuid.UUID
+	SelectedColumnsJSON []byte
+	RowCount            int
+	StorageBucket       string
+	StorageObjectKey    string
+	StorageURL          string
 }

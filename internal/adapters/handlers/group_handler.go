@@ -20,10 +20,11 @@ type GroupHandler struct {
 	querySvc  ports.ReceiptQueryService
 	reviewSvc ports.ReceiptReviewService
 	retrySvc  ports.OCRRetryService
+	exportSvc ports.GroupExportService
 }
 
-func NewGroupHandler(svc ports.ReceiptGroupService, uploadSvc ports.ReceiptUploadService, querySvc ports.ReceiptQueryService, reviewSvc ports.ReceiptReviewService, retrySvc ports.OCRRetryService) *GroupHandler {
-	return &GroupHandler{svc: svc, uploadSvc: uploadSvc, querySvc: querySvc, reviewSvc: reviewSvc, retrySvc: retrySvc}
+func NewGroupHandler(svc ports.ReceiptGroupService, uploadSvc ports.ReceiptUploadService, querySvc ports.ReceiptQueryService, reviewSvc ports.ReceiptReviewService, retrySvc ports.OCRRetryService, exportSvc ports.GroupExportService) *GroupHandler {
+	return &GroupHandler{svc: svc, uploadSvc: uploadSvc, querySvc: querySvc, reviewSvc: reviewSvc, retrySvc: retrySvc, exportSvc: exportSvc}
 }
 
 func (h *GroupHandler) CreateGroup(w http.ResponseWriter, r *http.Request) {
@@ -430,6 +431,84 @@ func (h *GroupHandler) RetryImage(w http.ResponseWriter, r *http.Request) {
 	}{Status: true, Data: job})
 }
 
+func (h *GroupHandler) CreateCSVExport(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: "Only POST is allowed"})
+		return
+	}
+
+	userID, ok := requestUserID(r)
+	if !ok {
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: "Unauthorized"})
+		return
+	}
+
+	groupID, err := nestedGroupIDFromExportPath(r.URL.Path, "csv")
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: "Invalid group ID"})
+		return
+	}
+
+	var body CreateCSVExportRequest
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: "Invalid request body"})
+		return
+	}
+
+	exportRecord, err := h.exportSvc.CreateCSVExport(r.Context(), userID, groupID, body.SelectedColumns, body.IncludeCorrectedValues)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: err.Error()})
+		return
+	}
+
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(struct {
+		Status bool                `json:"status"`
+		Data   *domain.GroupExport `json:"data"`
+	}{Status: true, Data: exportRecord})
+}
+
+func (h *GroupHandler) ListGroupExports(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: "Only GET is allowed"})
+		return
+	}
+
+	userID, ok := requestUserID(r)
+	if !ok {
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: "Unauthorized"})
+		return
+	}
+
+	groupID, err := nestedGroupIDFromPath(r.URL.Path, "exports")
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: "Invalid group ID"})
+		return
+	}
+
+	exports, err := h.exportSvc.ListGroupExports(r.Context(), userID, groupID, queryInt(r, "limit", 20), queryInt(r, "offset", 0))
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: err.Error()})
+		return
+	}
+
+	json.NewEncoder(w).Encode(struct {
+		Status bool                 `json:"status"`
+		Data   []domain.GroupExport `json:"data"`
+	}{Status: true, Data: exports})
+}
+
 func requestUserID(r *http.Request) (uuid.UUID, bool) {
 	val := r.Context().Value("user_id")
 	if val == nil {
@@ -506,6 +585,15 @@ func nestedImageIDFromPath(path string, tail string) (uuid.UUID, error) {
 	parts := strings.Split(trimmed, "/")
 	if len(parts) != 5 || parts[4] != tail {
 		return uuid.Nil, fmt.Errorf("invalid nested image path")
+	}
+	return uuid.Parse(parts[3])
+}
+
+func nestedGroupIDFromExportPath(path string, tail string) (uuid.UUID, error) {
+	trimmed := strings.Trim(path, "/")
+	parts := strings.Split(trimmed, "/")
+	if len(parts) != 6 || parts[4] != "exports" || parts[5] != tail {
+		return uuid.Nil, fmt.Errorf("invalid export path")
 	}
 	return uuid.Parse(parts[3])
 }

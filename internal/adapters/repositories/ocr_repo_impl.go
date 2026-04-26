@@ -36,6 +36,10 @@ type receiptReviewRepo struct {
 	db *pgxpool.Pool
 }
 
+type groupExportRepo struct {
+	db *pgxpool.Pool
+}
+
 func NewReceiptGroupRepository(db *pgxpool.Pool) ports.ReceiptGroupRepository {
 	return &receiptGroupRepo{db: db}
 }
@@ -58,6 +62,10 @@ func NewDashboardRepository(db *pgxpool.Pool) ports.DashboardRepository {
 
 func NewReceiptReviewRepository(db *pgxpool.Pool) ports.ReceiptReviewRepository {
 	return &receiptReviewRepo{db: db}
+}
+
+func NewGroupExportRepository(db *pgxpool.Pool) ports.GroupExportRepository {
+	return &groupExportRepo{db: db}
 }
 
 func (r *receiptGroupRepo) Create(ctx context.Context, input domain.CreateReceiptGroupInput) (*domain.ReceiptGroup, error) {
@@ -912,6 +920,7 @@ var _ ports.OCRExtractionRepository = (*ocrExtractionRepo)(nil)
 var _ ports.OCRJobRepository = (*ocrJobRepo)(nil)
 var _ ports.DashboardRepository = (*dashboardRepo)(nil)
 var _ ports.ReceiptReviewRepository = (*receiptReviewRepo)(nil)
+var _ ports.GroupExportRepository = (*groupExportRepo)(nil)
 
 func (r *dashboardRepo) GetSummary(ctx context.Context, userID uuid.UUID) (*domain.DashboardSummary, error) {
 	if r.db == nil {
@@ -1091,4 +1100,97 @@ func (r *receiptReviewRepo) GetByReceiptImageID(ctx context.Context, receiptImag
 	}
 	review.ReviewNotes = nullableText(notes)
 	return &review, nil
+}
+
+func (r *groupExportRepo) Create(ctx context.Context, input domain.CreateGroupExportInput) (*domain.GroupExport, error) {
+	if r.db == nil {
+		return nil, errors.New("database connection is not available")
+	}
+
+	query := `
+		INSERT INTO group_exports (
+			group_id, exported_by_user_id, format, selected_columns_json, row_count,
+			storage_bucket, storage_object_key, storage_url
+		)
+		VALUES ($1, $2, 'csv', $3, $4, NULLIF($5, ''), NULLIF($6, ''), NULLIF($7, ''))
+		RETURNING id, group_id, exported_by_user_id, format, selected_columns_json, row_count,
+		          storage_bucket, storage_object_key, storage_url, created_at
+	`
+
+	var export domain.GroupExport
+	var bucket, objectKey, storageURL pgtype.Text
+	err := r.db.QueryRow(ctx, query,
+		input.GroupID,
+		input.ExportedByUserID,
+		input.SelectedColumnsJSON,
+		input.RowCount,
+		input.StorageBucket,
+		input.StorageObjectKey,
+		input.StorageURL,
+	).Scan(
+		&export.ID,
+		&export.GroupID,
+		&export.ExportedByUserID,
+		&export.Format,
+		&export.SelectedColumnsJSON,
+		&export.RowCount,
+		&bucket,
+		&objectKey,
+		&storageURL,
+		&export.CreatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	export.StorageBucket = nullableText(bucket)
+	export.StorageObjectKey = nullableText(objectKey)
+	export.StorageURL = nullableText(storageURL)
+	return &export, nil
+}
+
+func (r *groupExportRepo) ListByGroup(ctx context.Context, userID, groupID uuid.UUID, limit, offset int) ([]domain.GroupExport, error) {
+	if r.db == nil {
+		return nil, errors.New("database connection is not available")
+	}
+
+	query := `
+		SELECT ge.id, ge.group_id, ge.exported_by_user_id, ge.format, ge.selected_columns_json, ge.row_count,
+		       ge.storage_bucket, ge.storage_object_key, ge.storage_url, ge.created_at
+		FROM group_exports ge
+		INNER JOIN receipt_groups rg ON rg.id = ge.group_id
+		WHERE rg.user_id = $1 AND ge.group_id = $2
+		ORDER BY ge.created_at DESC
+		LIMIT $3 OFFSET $4
+	`
+
+	rows, err := r.db.Query(ctx, query, userID, groupID, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var exports []domain.GroupExport
+	for rows.Next() {
+		var export domain.GroupExport
+		var bucket, objectKey, storageURL pgtype.Text
+		if err := rows.Scan(
+			&export.ID,
+			&export.GroupID,
+			&export.ExportedByUserID,
+			&export.Format,
+			&export.SelectedColumnsJSON,
+			&export.RowCount,
+			&bucket,
+			&objectKey,
+			&storageURL,
+			&export.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		export.StorageBucket = nullableText(bucket)
+		export.StorageObjectKey = nullableText(objectKey)
+		export.StorageURL = nullableText(storageURL)
+		exports = append(exports, export)
+	}
+	return exports, rows.Err()
 }

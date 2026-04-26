@@ -48,6 +48,7 @@ func main() {
 	jobRepo := repositories.NewOCRJobRepository(dbManager.Pool)
 	dashboardRepo := repositories.NewDashboardRepository(dbManager.Pool)
 	reviewRepo := repositories.NewReceiptReviewRepository(dbManager.Pool)
+	exportRepo := repositories.NewGroupExportRepository(dbManager.Pool)
 	objectStorageSvc, err := storage.NewObjectStorageService(cfg.MinIO)
 	if err != nil {
 		log.Fatal(err)
@@ -60,9 +61,10 @@ func main() {
 	dashboardSvc := services.NewDashboardService(dashboardRepo)
 	reviewSvc := services.NewReceiptReviewService(reviewRepo, imageRepo, groupRepo)
 	retrySvc := services.NewOCRRetryService(imageRepo, jobRepo, groupRepo)
+	exportSvc := services.NewGroupExportService(groupRepo, imageRepo, extractionRepo, reviewRepo, exportRepo, objectStorageSvc)
 	ocrJobSvc := services.NewOCRJobService(jobRepo, imageRepo, extractionRepo, groupRepo, objectStorageSvc, ocrEngineSvc, cfg.OCREngine.MaxConcurrency)
 	userHandler := handlers.NewUserHandler(userSvc)
-	groupHandler := handlers.NewGroupHandler(groupSvc, uploadSvc, querySvc, reviewSvc, retrySvc)
+	groupHandler := handlers.NewGroupHandler(groupSvc, uploadSvc, querySvc, reviewSvc, retrySvc, exportSvc)
 	dashboardHandler := handlers.NewDashboardHandler(dashboardSvc)
 
 	// 3. Initialize Server

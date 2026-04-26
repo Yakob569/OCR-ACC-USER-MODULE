@@ -64,3 +64,8 @@ type SubmitReviewRequest struct {
 	CorrectedFields json.RawMessage `json:"corrected_fields"`
 	ReviewNotes     string          `json:"review_notes"`
 }
+
+type CreateCSVExportRequest struct {
+	SelectedColumns        []string `json:"selected_columns"`
+	IncludeCorrectedValues bool     `json:"include_corrected_values"`
+}

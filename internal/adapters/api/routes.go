@@ -46,6 +46,14 @@ func (s *Server) RegisterRoutes() http.Handler {
 			s.groupHandler.ListGroupResults(w, r)
 			return
 		}
+		if strings.HasSuffix(r.URL.Path, "/exports/csv") {
+			s.groupHandler.CreateCSVExport(w, r)
+			return
+		}
+		if strings.HasSuffix(r.URL.Path, "/exports") {
+			s.groupHandler.ListGroupExports(w, r)
+			return
+		}
 		s.groupHandler.GetGroup(w, r)
 	})
 	protectedMux.HandleFunc("/api/v1/images/", func(w http.ResponseWriter, r *http.Request) {

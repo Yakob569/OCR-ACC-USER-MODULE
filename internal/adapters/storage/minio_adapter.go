@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -80,12 +81,39 @@ func (s *minioObjectStorageService) DownloadReceiptImage(ctx context.Context, bu
 	return io.ReadAll(object)
 }
 
+func (s *minioObjectStorageService) UploadGroupExport(ctx context.Context, userID, groupID, exportID uuid.UUID, content []byte) (string, string, *string, error) {
+	exists, err := s.client.BucketExists(ctx, s.bucket)
+	if err != nil {
+		return "", "", nil, err
+	}
+	if !exists {
+		if err := s.client.MakeBucket(ctx, s.bucket, minio.MakeBucketOptions{}); err != nil {
+			return "", "", nil, err
+		}
+	}
+
+	objectKey := fmt.Sprintf("exports/%s/%s/%s.csv", userID.String(), groupID.String(), exportID.String())
+	_, err = s.client.PutObject(ctx, s.bucket, objectKey, bytes.NewReader(content), int64(len(content)), minio.PutObjectOptions{
+		ContentType: "text/csv",
+	})
+	if err != nil {
+		return "", "", nil, err
+	}
+
+	objectURL := buildObjectURL(s.useSSL, s.endpoint, s.bucket, objectKey)
+	return s.bucket, objectKey, &objectURL, nil
+}
+
 func (s *disabledObjectStorageService) UploadReceiptImage(ctx context.Context, userID, groupID, imageID uuid.UUID, filename, contentType string, content io.Reader, contentLength int64) (string, string, *string, error) {
 	return "", "", nil, fmt.Errorf("object storage is unavailable: %s", s.reason)
 }
 
 func (s *disabledObjectStorageService) DownloadReceiptImage(ctx context.Context, bucket, objectKey string) ([]byte, error) {
 	return nil, fmt.Errorf("object storage is unavailable: %s", s.reason)
+}
+
+func (s *disabledObjectStorageService) UploadGroupExport(ctx context.Context, userID, groupID, exportID uuid.UUID, content []byte) (string, string, *string, error) {
+	return "", "", nil, fmt.Errorf("object storage is unavailable: %s", s.reason)
 }
 
 func buildObjectKey(userID, groupID, imageID uuid.UUID, filename string) string {

@@ -112,7 +112,7 @@ func (s *groupExportService) CreateCSVExport(ctx context.Context, userID, groupI
 		return nil, err
 	}
 
-	_ = s.groupRepo.IncrementImageCounters(ctx, groupID, 0, 0, 0, 0, 0, 0, 1)
+	_, _ = s.groupRepo.RefreshAggregateState(ctx, groupID)
 	return exportRecord, nil
 }
 

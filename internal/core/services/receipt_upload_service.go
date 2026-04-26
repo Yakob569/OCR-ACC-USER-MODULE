@@ -132,10 +132,7 @@ func (s *receiptUploadService) UploadGroupImages(ctx context.Context, groupID, u
 		return nil, err
 	}
 
-	if err := s.groupRepo.IncrementImageCounters(ctx, groupID, len(images), len(images), 0, 0, 0, 0, 0); err != nil {
-		return nil, err
-	}
-	if err := s.groupRepo.UpdateStatus(ctx, groupID, domain.GroupStatusQueued); err != nil {
+	if _, err := s.groupRepo.RefreshAggregateState(ctx, groupID); err != nil {
 		return nil, err
 	}
 

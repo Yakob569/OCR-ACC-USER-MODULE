@@ -57,10 +57,9 @@ func (s *ocrRetryService) RetryImage(ctx context.Context, userID, imageID uuid.U
 		return nil, err
 	}
 
-	if err := s.groupRepo.IncrementImageCounters(ctx, image.GroupID, 0, 1, 0, 0, -1, 0, 0); err != nil {
+	if _, err := s.groupRepo.RefreshAggregateState(ctx, image.GroupID); err != nil {
 		return nil, err
 	}
-	_ = s.groupRepo.UpdateStatus(ctx, image.GroupID, domain.GroupStatusQueued)
 
 	return &jobs[0], nil
 }

@@ -16,6 +16,7 @@ type ReceiptGroupRepository interface {
 	GetByUserAndID(ctx context.Context, userID, id uuid.UUID) (*domain.ReceiptGroup, error)
 	UpdateStatus(ctx context.Context, id uuid.UUID, status string) error
 	IncrementImageCounters(ctx context.Context, id uuid.UUID, total, queued, processing, completed, failed, reviewed, exports int) error
+	RefreshAggregateState(ctx context.Context, id uuid.UUID) (*domain.ReceiptGroup, error)
 }
 
 type ReceiptImageRepository interface {

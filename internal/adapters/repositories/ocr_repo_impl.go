@@ -227,6 +227,71 @@ func (r *receiptGroupRepo) IncrementImageCounters(ctx context.Context, id uuid.U
 	return err
 }
 
+func (r *receiptGroupRepo) RefreshAggregateState(ctx context.Context, id uuid.UUID) (*domain.ReceiptGroup, error) {
+	if r.db == nil {
+		return nil, errors.New("database connection is not available")
+	}
+
+	var total, queued, processing, completed, failed, reviewed, exports int
+	err := r.db.QueryRow(ctx, `
+		SELECT
+			(SELECT COUNT(*) FROM receipt_images WHERE group_id = $1),
+			(SELECT COUNT(*) FROM receipt_images WHERE group_id = $1 AND ocr_status = $2),
+			(SELECT COUNT(*) FROM receipt_images WHERE group_id = $1 AND ocr_status = $3),
+			(SELECT COUNT(*) FROM receipt_images WHERE group_id = $1 AND ocr_status = $4),
+			(SELECT COUNT(*) FROM receipt_images WHERE group_id = $1 AND ocr_status = $5),
+			(SELECT COUNT(*) FROM receipt_images WHERE group_id = $1 AND review_status IN ($6, $7, $8)),
+			(SELECT COUNT(*) FROM group_exports WHERE group_id = $1)
+	`, id,
+		domain.OCRStatusQueued,
+		domain.OCRStatusProcessing,
+		domain.OCRStatusCompleted,
+		domain.OCRStatusFailed,
+		domain.ReviewStatusReviewed,
+		domain.ReviewStatusAccepted,
+		domain.ReviewStatusRejected,
+	).Scan(&total, &queued, &processing, &completed, &failed, &reviewed, &exports)
+	if err != nil {
+		return nil, err
+	}
+
+	status := domain.GroupStatusDraft
+	switch {
+	case total == 0:
+		status = domain.GroupStatusDraft
+	case processing > 0:
+		status = domain.GroupStatusProcessing
+	case queued > 0 && completed == 0 && failed == 0:
+		status = domain.GroupStatusQueued
+	case completed > 0 && failed > 0:
+		status = domain.GroupStatusCompletedWithFailures
+	case completed == total:
+		status = domain.GroupStatusCompleted
+	case failed == total:
+		status = domain.GroupStatusFailed
+	case queued > 0:
+		status = domain.GroupStatusQueued
+	}
+
+	_, err = r.db.Exec(ctx, `
+		UPDATE receipt_groups
+		SET status = $2,
+		    total_images = $3,
+		    queued_images = $4,
+		    processing_images = $5,
+		    completed_images = $6,
+		    failed_images = $7,
+		    reviewed_images = $8,
+		    export_count = $9
+		WHERE id = $1
+	`, id, status, total, queued, processing, completed, failed, reviewed, exports)
+	if err != nil {
+		return nil, err
+	}
+
+	return r.GetByID(ctx, id)
+}
+
 func (r *receiptImageRepo) CreateMany(ctx context.Context, inputs []domain.ReceiptImageUploadInput) ([]domain.ReceiptImage, error) {
 	if r.db == nil {
 		return nil, errors.New("database connection is not available")

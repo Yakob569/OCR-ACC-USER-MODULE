@@ -103,8 +103,7 @@ func (s *ocrJobService) ProcessJob(ctx context.Context, jobID uuid.UUID) error {
 	if err := s.imageRepo.UpdateStatuses(ctx, image.ID, image.UploadStatus, domain.OCRStatusProcessing, image.ReviewStatus); err != nil {
 		return err
 	}
-	_ = s.groupRepo.IncrementImageCounters(ctx, image.GroupID, 0, -1, 1, 0, 0, 0, 0)
-	_ = s.groupRepo.UpdateStatus(ctx, image.GroupID, domain.GroupStatusProcessing)
+	_, _ = s.groupRepo.RefreshAggregateState(ctx, image.GroupID)
 
 	imageBytes, err := s.objectStorage.DownloadReceiptImage(ctx, image.StorageBucket, image.StorageObjectKey)
 	if err != nil {
@@ -136,8 +135,7 @@ func (s *ocrJobService) ProcessJob(ctx context.Context, jobID uuid.UUID) error {
 		return err
 	}
 
-	_ = s.groupRepo.IncrementImageCounters(ctx, image.GroupID, 0, 0, -1, 1, 0, 0, 0)
-	_ = s.groupRepo.UpdateStatus(ctx, image.GroupID, domain.GroupStatusCompleted)
+	_, _ = s.groupRepo.RefreshAggregateState(ctx, image.GroupID)
 	return nil
 }
 
@@ -151,7 +149,6 @@ func (s *ocrJobService) failJob(ctx context.Context, job *domain.OCRJob, code, m
 	if err := s.jobRepo.UpdateStatus(ctx, job.ID, domain.JobStatusFailed, &s.workerID, &errorCode, &errorMessage); err != nil {
 		return err
 	}
-	_ = s.groupRepo.IncrementImageCounters(ctx, job.GroupID, 0, 0, -1, 0, 1, 0, 0)
-	_ = s.groupRepo.UpdateStatus(ctx, job.GroupID, domain.GroupStatusCompletedWithFailures)
+	_, _ = s.groupRepo.RefreshAggregateState(ctx, job.GroupID)
 	return fmt.Errorf("%s: %s", code, message)
 }

@@ -53,7 +53,7 @@ func (s *receiptReviewService) SubmitReview(ctx context.Context, input domain.Su
 	}
 
 	if existingErr != nil {
-		_ = s.groupRepo.IncrementImageCounters(ctx, image.GroupID, 0, 0, 0, 0, 0, 1, 0)
+		_, _ = s.groupRepo.RefreshAggregateState(ctx, image.GroupID)
 	}
 
 	return review, nil

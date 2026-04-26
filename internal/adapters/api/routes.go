@@ -76,11 +76,13 @@ func (s *Server) RegisterRoutes() http.Handler {
 	authMiddleware := AuthMiddleware(s.authSvc)
 
 	// Final handler that routes to either mux
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	var finalHandler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/v1/profile" || r.URL.Path == "/api/v1/dashboard/summary" || r.URL.Path == "/api/v1/groups" || strings.HasPrefix(r.URL.Path, "/api/v1/groups/") || strings.HasPrefix(r.URL.Path, "/api/v1/images/") {
 			authMiddleware(protectedMux).ServeHTTP(w, r)
 			return
 		}
 		mux.ServeHTTP(w, r)
 	})
+
+	return corsMiddleware(finalHandler)
 }

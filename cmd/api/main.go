@@ -46,6 +46,7 @@ func main() {
 	imageRepo := repositories.NewReceiptImageRepository(dbManager.Pool)
 	extractionRepo := repositories.NewOCRExtractionRepository(dbManager.Pool)
 	jobRepo := repositories.NewOCRJobRepository(dbManager.Pool)
+	dashboardRepo := repositories.NewDashboardRepository(dbManager.Pool)
 	objectStorageSvc, err := storage.NewObjectStorageService(cfg.MinIO)
 	if err != nil {
 		log.Fatal(err)
@@ -55,12 +56,14 @@ func main() {
 	groupSvc := services.NewReceiptGroupService(groupRepo)
 	uploadSvc := services.NewReceiptUploadService(groupRepo, imageRepo, jobRepo, objectStorageSvc, cfg.OCRGroupMaxFiles, cfg.OCRMaxFileSizeMB)
 	querySvc := services.NewReceiptQueryService(groupRepo, imageRepo, extractionRepo)
+	dashboardSvc := services.NewDashboardService(dashboardRepo)
 	ocrJobSvc := services.NewOCRJobService(jobRepo, imageRepo, extractionRepo, groupRepo, objectStorageSvc, ocrEngineSvc, cfg.OCREngine.MaxConcurrency)
 	userHandler := handlers.NewUserHandler(userSvc)
 	groupHandler := handlers.NewGroupHandler(groupSvc, uploadSvc, querySvc)
+	dashboardHandler := handlers.NewDashboardHandler(dashboardSvc)
 
 	// 3. Initialize Server
-	server := api.NewServer(cfg.Port, userHandler, groupHandler, authAdapter, dbManager.Pool)
+	server := api.NewServer(cfg.Port, userHandler, groupHandler, dashboardHandler, authAdapter, dbManager.Pool)
 
 	// 4. Start Server in a goroutine
 	go func() {

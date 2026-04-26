@@ -28,6 +28,10 @@ type ocrJobRepo struct {
 	db *pgxpool.Pool
 }
 
+type dashboardRepo struct {
+	db *pgxpool.Pool
+}
+
 func NewReceiptGroupRepository(db *pgxpool.Pool) ports.ReceiptGroupRepository {
 	return &receiptGroupRepo{db: db}
 }
@@ -42,6 +46,10 @@ func NewOCRExtractionRepository(db *pgxpool.Pool) ports.OCRExtractionRepository 
 
 func NewOCRJobRepository(db *pgxpool.Pool) ports.OCRJobRepository {
 	return &ocrJobRepo{db: db}
+}
+
+func NewDashboardRepository(db *pgxpool.Pool) ports.DashboardRepository {
+	return &dashboardRepo{db: db}
 }
 
 func (r *receiptGroupRepo) Create(ctx context.Context, input domain.CreateReceiptGroupInput) (*domain.ReceiptGroup, error) {
@@ -894,3 +902,109 @@ var _ ports.ReceiptGroupRepository = (*receiptGroupRepo)(nil)
 var _ ports.ReceiptImageRepository = (*receiptImageRepo)(nil)
 var _ ports.OCRExtractionRepository = (*ocrExtractionRepo)(nil)
 var _ ports.OCRJobRepository = (*ocrJobRepo)(nil)
+var _ ports.DashboardRepository = (*dashboardRepo)(nil)
+
+func (r *dashboardRepo) GetSummary(ctx context.Context, userID uuid.UUID) (*domain.DashboardSummary, error) {
+	if r.db == nil {
+		return nil, errors.New("database connection is not available")
+	}
+
+	summary := &domain.DashboardSummary{}
+
+	if err := r.db.QueryRow(ctx, `
+		SELECT
+			(SELECT COUNT(*) FROM receipt_groups WHERE user_id = $1),
+			(SELECT COUNT(*) FROM receipt_images WHERE user_id = $1),
+			(SELECT COUNT(*) FROM receipt_images WHERE user_id = $1 AND ocr_status = $2),
+			(SELECT COUNT(*) FROM receipt_images WHERE user_id = $1 AND ocr_status = $3),
+			(SELECT COUNT(*) FROM receipt_images WHERE user_id = $1 AND ocr_status = $4)
+	`, userID, domain.OCRStatusCompleted, domain.OCRStatusFailed, domain.OCRStatusNeedsReview).Scan(
+		&summary.TotalGroups,
+		&summary.TotalScans,
+		&summary.SuccessfulScans,
+		&summary.FailedScans,
+		&summary.NeedsReviewScans,
+	); err != nil {
+		return nil, err
+	}
+
+	var averageConfidence pgtype.Float8
+	var acceptedAccuracy pgtype.Float8
+	if err := r.db.QueryRow(ctx, `
+		SELECT
+			(SELECT AVG(overall_confidence) FROM receipt_images WHERE user_id = $1 AND overall_confidence IS NOT NULL),
+			(
+				SELECT AVG(CASE WHEN quality_label = 'accurate' THEN 1.0 ELSE 0.0 END)
+				FROM receipt_reviews rr
+				INNER JOIN receipt_images ri ON ri.id = rr.receipt_image_id
+				WHERE ri.user_id = $1
+			)
+	`, userID).Scan(&averageConfidence, &acceptedAccuracy); err != nil {
+		return nil, err
+	}
+	summary.AverageConfidence = nullableFloat(averageConfidence)
+	summary.AcceptedAccuracyRate = nullableFloat(acceptedAccuracy)
+
+	groupRows, err := r.db.Query(ctx, `
+		SELECT id, user_id, name, description, status, total_images, queued_images, processing_images,
+		       completed_images, failed_images, reviewed_images, export_count, created_at, updated_at
+		FROM receipt_groups
+		WHERE user_id = $1
+		ORDER BY created_at DESC
+		LIMIT 5
+	`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer groupRows.Close()
+
+	for groupRows.Next() {
+		var group domain.ReceiptGroup
+		var description pgtype.Text
+		if err := groupRows.Scan(
+			&group.ID,
+			&group.UserID,
+			&group.Name,
+			&description,
+			&group.Status,
+			&group.TotalImages,
+			&group.QueuedImages,
+			&group.ProcessingImages,
+			&group.CompletedImages,
+			&group.FailedImages,
+			&group.ReviewedImages,
+			&group.ExportCount,
+			&group.CreatedAt,
+			&group.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		group.Description = nullableText(description)
+		summary.RecentGroups = append(summary.RecentGroups, group)
+	}
+
+	imageRows, err := r.db.Query(ctx, `
+		SELECT id, group_id, user_id, original_filename, mime_type, file_size_bytes, checksum_sha256,
+		       storage_bucket, storage_object_key, storage_url, upload_status, ocr_status, review_status,
+		       ocr_attempt_count, last_error_code, last_error_message, receipt_type, overall_confidence,
+		       processed_at, created_at, updated_at
+		FROM receipt_images
+		WHERE user_id = $1
+		ORDER BY created_at DESC
+		LIMIT 10
+	`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer imageRows.Close()
+
+	for imageRows.Next() {
+		image, err := scanReceiptImage(imageRows)
+		if err != nil {
+			return nil, err
+		}
+		summary.RecentImages = append(summary.RecentImages, *image)
+	}
+
+	return summary, nil
+}

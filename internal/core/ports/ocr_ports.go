@@ -70,6 +70,10 @@ type DashboardService interface {
 	GetSummary(ctx context.Context, userID uuid.UUID) (*domain.DashboardSummary, error)
 }
 
+type DashboardRepository interface {
+	GetSummary(ctx context.Context, userID uuid.UUID) (*domain.DashboardSummary, error)
+}
+
 type ReceiptQueryService interface {
 	ListGroupImages(ctx context.Context, userID, groupID uuid.UUID, limit, offset int) ([]domain.ReceiptImage, error)
 	GetImage(ctx context.Context, userID, imageID uuid.UUID) (*domain.ReceiptImage, error)

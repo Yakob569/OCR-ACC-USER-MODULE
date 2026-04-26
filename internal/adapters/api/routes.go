@@ -18,6 +18,7 @@ func (s *Server) RegisterRoutes() http.Handler {
 	// Protected Routes
 	protectedMux := http.NewServeMux()
 	protectedMux.HandleFunc("/api/v1/profile", s.userHandler.GetProfile)
+	protectedMux.HandleFunc("/api/v1/dashboard/summary", s.dashboardHandler.GetSummary)
 	protectedMux.HandleFunc("/api/v1/groups", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
 			s.groupHandler.CreateGroup(w, r)
@@ -60,7 +61,7 @@ func (s *Server) RegisterRoutes() http.Handler {
 
 	// Final handler that routes to either mux
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/v1/profile" || r.URL.Path == "/api/v1/groups" || strings.HasPrefix(r.URL.Path, "/api/v1/groups/") || strings.HasPrefix(r.URL.Path, "/api/v1/images/") {
+		if r.URL.Path == "/api/v1/profile" || r.URL.Path == "/api/v1/dashboard/summary" || r.URL.Path == "/api/v1/groups" || strings.HasPrefix(r.URL.Path, "/api/v1/groups/") || strings.HasPrefix(r.URL.Path, "/api/v1/images/") {
 			authMiddleware(protectedMux).ServeHTTP(w, r)
 			return
 		}

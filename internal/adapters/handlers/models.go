@@ -32,6 +32,10 @@ type RefreshTokenRequest struct {
 	RefreshToken string `json:"refresh_token"`
 }
 
+type LogoutRequest struct {
+	RefreshToken string `json:"refresh_token"`
+}
+
 type SocialLoginResponse struct {
 	Status           bool   `json:"status"`
 	AuthorizationURL string `json:"authorization_url"`

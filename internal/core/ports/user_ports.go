@@ -32,5 +32,6 @@ type UserService interface {
 	Register(ctx context.Context, email, password, fullName, phone string) (*domain.User, *domain.TokenPair, error)
 	Login(ctx context.Context, email, password string) (*domain.TokenPair, error)
 	RefreshToken(ctx context.Context, token string) (*domain.TokenPair, error)
+	Logout(ctx context.Context, token string) error
 	GetProfile(ctx context.Context, id uuid.UUID) (*domain.User, error)
 }

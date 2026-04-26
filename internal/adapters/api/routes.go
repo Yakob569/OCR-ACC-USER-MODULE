@@ -10,6 +10,7 @@ func (s *Server) RegisterRoutes() http.Handler {
 	mux.HandleFunc("/api/v1/register", s.userHandler.Register)
 	mux.HandleFunc("/api/v1/login", s.userHandler.Login)
 	mux.HandleFunc("/api/v1/refresh", s.userHandler.RefreshToken)
+	mux.HandleFunc("/api/v1/logout", s.userHandler.Logout)
 
 	// Protected Routes
 	protectedMux := http.NewServeMux()
@@ -17,7 +18,7 @@ func (s *Server) RegisterRoutes() http.Handler {
 
 	// Wrap protected routes with AuthMiddleware
 	authMiddleware := AuthMiddleware(s.authSvc)
-	
+
 	// Final handler that routes to either mux
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/v1/profile" {

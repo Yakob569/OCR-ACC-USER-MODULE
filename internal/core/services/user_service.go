@@ -145,6 +145,25 @@ func (s *userService) RefreshToken(ctx context.Context, token string) (*domain.T
 	return tokens, nil
 }
 
+func (s *userService) Logout(ctx context.Context, token string) error {
+	log.Printf("[UserService] Starting logout")
+
+	if token == "" {
+		return fmt.Errorf("refresh token is required")
+	}
+
+	if _, err := s.repo.GetRefreshToken(ctx, token); err != nil {
+		return fmt.Errorf("invalid refresh token: %w", err)
+	}
+
+	if err := s.repo.RevokeRefreshToken(ctx, token); err != nil {
+		return fmt.Errorf("failed to revoke refresh token: %w", err)
+	}
+
+	log.Printf("[UserService] Logout complete")
+	return nil
+}
+
 func (s *userService) GetProfile(ctx context.Context, id uuid.UUID) (*domain.User, error) {
 	log.Printf("[UserService] Fetching profile for user ID: %s", id)
 	return s.repo.GetUserByID(ctx, id)

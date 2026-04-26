@@ -67,9 +67,9 @@ func (h *UserHandler) Register(w http.ResponseWriter, r *http.Request) {
 	log.Printf("✅ [Register] Successfully registered user ID: %s", user.ID)
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(struct {
-		Status bool            `json:"status"`
-		Data   interface{}     `json:"data"`
-		Tokens interface{}     `json:"tokens"`
+		Status bool        `json:"status"`
+		Data   interface{} `json:"data"`
+		Tokens interface{} `json:"tokens"`
 	}{
 		Status: true,
 		Data:   user,
@@ -150,10 +150,43 @@ func (h *UserHandler) RefreshToken(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (h *UserHandler) Logout(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	log.Printf("➡️  [POST] /api/v1/logout - Logout request")
+
+	if r.Method != http.MethodPost {
+		log.Printf("⚠️  [Logout] Method not allowed: %s", r.Method)
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: "Only POST is allowed"})
+		return
+	}
+
+	var body LogoutRequest
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		log.Printf("❌ [Logout] JSON decode error: %v", err)
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: "Invalid request body"})
+		return
+	}
+
+	if err := h.svc.Logout(r.Context(), body.RefreshToken); err != nil {
+		log.Printf("❌ [Logout] Logout failed: %v", err)
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: "Invalid or expired refresh token"})
+		return
+	}
+
+	log.Printf("✅ [Logout] Refresh token revoked successfully")
+	json.NewEncoder(w).Encode(MessageResponse{
+		Status:  true,
+		Message: "Logged out successfully",
+	})
+}
+
 func (h *UserHandler) GetProfile(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	log.Printf("➡️  [GET] /api/v1/profile - Fetching user profile")
-	
+
 	val := r.Context().Value("user_id")
 	if val == nil {
 		log.Printf("⚠️  [Profile] Unauthorized access attempt (no user_id in context)")

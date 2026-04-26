@@ -57,4 +57,9 @@ func TestJWTAuthAdapter(t *testing.T) {
 	if userID != user.ID {
 		t.Errorf("Validated user ID mismatch: expected %v, got %v", user.ID, userID)
 	}
+
+	_, err = adapter.ValidateToken(tokens.RefreshToken)
+	if err == nil {
+		t.Errorf("Refresh token should not be accepted as an access token")
+	}
 }

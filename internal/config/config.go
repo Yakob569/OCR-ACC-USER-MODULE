@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"log"
 	"os"
 
@@ -42,6 +43,10 @@ func LoadConfig() (*Config, error) {
 
 	if cfg.DatabaseURL == "" && cfg.DBPass == "" {
 		log.Println("Warning: Neither DATABASE_URL nor DB_PASS is set, using default values")
+	}
+
+	if cfg.JWTSecret == "" || cfg.JWTSecret == "change-me-at-all-costs" {
+		return nil, errors.New("JWT_SECRET must be set to a non-default value")
 	}
 
 	return cfg, nil

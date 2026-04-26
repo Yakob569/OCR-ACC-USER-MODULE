@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"time"
@@ -9,6 +10,7 @@ import (
 	"github.com/cashflow/auth-service/internal/core/domain"
 	"github.com/cashflow/auth-service/internal/core/ports"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 type userService struct {
@@ -35,7 +37,10 @@ func (s *userService) Register(ctx context.Context, email, password, fullName, p
 
 	// 2. Check if user already exists
 	log.Printf("[UserService] Checking if user exists: %s", email)
-	existing, _ := s.repo.GetUserByEmail(ctx, email)
+	existing, err := s.repo.GetUserByEmail(ctx, email)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil, fmt.Errorf("failed to check existing user: %w", err)
+	}
 	if existing != nil {
 		return nil, nil, fmt.Errorf("user with email %s already exists", email)
 	}

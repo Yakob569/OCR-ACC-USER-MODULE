@@ -33,15 +33,19 @@ func main() {
 		dbManager.Close()
 	}()
 
-		// 2. Wire Hexagonal Architecture
+	if dbManager.Pool == nil {
+		log.Fatal("database connection is required to start the service")
+	}
+
+	// 2. Wire Hexagonal Architecture
 	authAdapter := auth.NewJWTAuthAdapter(cfg.JWTSecret)
 	userRepo := repositories.NewUserRepository(dbManager.Pool)
 	userSvc := services.NewUserService(userRepo, authAdapter)
 	userHandler := handlers.NewUserHandler(userSvc)
 
-		// 3. Initialize Server
+	// 3. Initialize Server
 	server := api.NewServer(cfg.Port, userHandler, authAdapter, dbManager.Pool)
-	
+
 	// 4. Start Server in a goroutine
 	go func() {
 		if err := server.Start(); err != nil && err != http.ErrServerClosed {

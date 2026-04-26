@@ -2,6 +2,7 @@ package auth
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/cashflow/auth-service/internal/core/domain"
@@ -12,7 +13,7 @@ import (
 )
 
 type jwtAuthAdapter struct {
-	secretKey     []byte
+	secretKey      []byte
 	accessTokenExp time.Duration
 }
 
@@ -33,13 +34,16 @@ func (a *jwtAuthAdapter) ComparePassword(password, hash string) error {
 }
 
 func (a *jwtAuthAdapter) GenerateTokenPair(user *domain.User) (*domain.TokenPair, error) {
+	now := time.Now()
+
 	// Access Token
 	accessClaims := jwt.MapClaims{
-		"sub":   user.ID.String(),
-		"email": user.Email,
-		"role":  user.Role,
-		"exp":   time.Now().Add(a.accessTokenExp).Unix(),
-		"iat":   time.Now().Unix(),
+		"sub":        user.ID.String(),
+		"email":      user.Email,
+		"role":       user.Role,
+		"token_type": "access",
+		"exp":        now.Add(a.accessTokenExp).Unix(),
+		"iat":        now.Unix(),
 	}
 
 	accessToken := jwt.NewWithClaims(jwt.SigningMethodHS256, accessClaims)
@@ -50,8 +54,10 @@ func (a *jwtAuthAdapter) GenerateTokenPair(user *domain.User) (*domain.TokenPair
 
 	// Refresh Token (simplified for this implementation, just a random UUID or longer JWT)
 	refreshClaims := jwt.MapClaims{
-		"sub": user.ID.String(),
-		"exp": time.Now().Add(time.Hour * 24 * 7).Unix(), // 7 days refresh token
+		"sub":        user.ID.String(),
+		"token_type": "refresh",
+		"exp":        now.Add(time.Hour * 24 * 7).Unix(), // 7 days refresh token
+		"iat":        now.Unix(),
 	}
 	refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, refreshClaims)
 	refreshStr, err := refreshToken.SignedString(a.secretKey)
@@ -68,6 +74,9 @@ func (a *jwtAuthAdapter) GenerateTokenPair(user *domain.User) (*domain.TokenPair
 
 func (a *jwtAuthAdapter) ValidateToken(tokenStr string) (uuid.UUID, error) {
 	token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) {
+		if token.Method != jwt.SigningMethodHS256 {
+			return nil, fmt.Errorf("unexpected signing method: %s", token.Method.Alg())
+		}
 		return a.secretKey, nil
 	})
 
@@ -78,6 +87,11 @@ func (a *jwtAuthAdapter) ValidateToken(tokenStr string) (uuid.UUID, error) {
 	claims, ok := token.Claims.(jwt.MapClaims)
 	if !ok {
 		return uuid.Nil, errors.New("invalid claims")
+	}
+
+	tokenType, ok := claims["token_type"].(string)
+	if !ok || tokenType != "access" {
+		return uuid.Nil, errors.New("invalid token type")
 	}
 
 	sub, ok := claims["sub"].(string)
@@ -96,6 +110,9 @@ func (a *jwtAuthAdapter) ValidateToken(tokenStr string) (uuid.UUID, error) {
 func (a *jwtAuthAdapter) RefreshToken(tokenStr string) (*domain.TokenPair, error) {
 	// Logic to refresh token by validating the refresh token and generating a new pair
 	token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) {
+		if token.Method != jwt.SigningMethodHS256 {
+			return nil, fmt.Errorf("unexpected signing method: %s", token.Method.Alg())
+		}
 		return a.secretKey, nil
 	})
 

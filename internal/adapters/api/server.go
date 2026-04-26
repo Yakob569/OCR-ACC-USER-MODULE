@@ -46,12 +46,18 @@ func (s *Server) Shutdown(ctx context.Context) error {
 }
 
 func (s *Server) healthCheck(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	if s.db == nil {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		fmt.Fprintf(w, `{"status":"unhealthy","database":"unavailable"}`)
+		return
+	}
+
 	if err := s.db.Ping(r.Context()); err != nil {
-		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		fmt.Fprintf(w, `{"status":"unhealthy","database":"disconnected"}`)
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
 	fmt.Fprintf(w, `{"status":"healthy","database":"connected"}`)
 }

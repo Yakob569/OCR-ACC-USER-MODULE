@@ -32,10 +32,27 @@ func (s *Server) RegisterRoutes() http.Handler {
 	})
 	protectedMux.HandleFunc("/api/v1/groups/", func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasSuffix(r.URL.Path, "/images") {
-			s.groupHandler.UploadGroupImages(w, r)
+			if r.Method == http.MethodPost {
+				s.groupHandler.UploadGroupImages(w, r)
+				return
+			}
+			if r.Method == http.MethodGet {
+				s.groupHandler.ListGroupImages(w, r)
+				return
+			}
+		}
+		if strings.HasSuffix(r.URL.Path, "/results") {
+			s.groupHandler.ListGroupResults(w, r)
 			return
 		}
 		s.groupHandler.GetGroup(w, r)
+	})
+	protectedMux.HandleFunc("/api/v1/images/", func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "/result") {
+			s.groupHandler.GetImageResult(w, r)
+			return
+		}
+		s.groupHandler.GetImage(w, r)
 	})
 
 	// Wrap protected routes with AuthMiddleware
@@ -43,7 +60,7 @@ func (s *Server) RegisterRoutes() http.Handler {
 
 	// Final handler that routes to either mux
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/v1/profile" || r.URL.Path == "/api/v1/groups" || strings.HasPrefix(r.URL.Path, "/api/v1/groups/") {
+		if r.URL.Path == "/api/v1/profile" || r.URL.Path == "/api/v1/groups" || strings.HasPrefix(r.URL.Path, "/api/v1/groups/") || strings.HasPrefix(r.URL.Path, "/api/v1/images/") {
 			authMiddleware(protectedMux).ServeHTTP(w, r)
 			return
 		}

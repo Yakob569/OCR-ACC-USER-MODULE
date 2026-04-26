@@ -17,10 +17,11 @@ import (
 type GroupHandler struct {
 	svc       ports.ReceiptGroupService
 	uploadSvc ports.ReceiptUploadService
+	querySvc  ports.ReceiptQueryService
 }
 
-func NewGroupHandler(svc ports.ReceiptGroupService, uploadSvc ports.ReceiptUploadService) *GroupHandler {
-	return &GroupHandler{svc: svc, uploadSvc: uploadSvc}
+func NewGroupHandler(svc ports.ReceiptGroupService, uploadSvc ports.ReceiptUploadService, querySvc ports.ReceiptQueryService) *GroupHandler {
+	return &GroupHandler{svc: svc, uploadSvc: uploadSvc, querySvc: querySvc}
 }
 
 func (h *GroupHandler) CreateGroup(w http.ResponseWriter, r *http.Request) {
@@ -201,6 +202,146 @@ func (h *GroupHandler) UploadGroupImages(w http.ResponseWriter, r *http.Request)
 	})
 }
 
+func (h *GroupHandler) ListGroupImages(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: "Only GET is allowed"})
+		return
+	}
+
+	userID, ok := requestUserID(r)
+	if !ok {
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: "Unauthorized"})
+		return
+	}
+
+	groupID, err := nestedGroupIDFromPath(r.URL.Path, "images")
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: "Invalid group ID"})
+		return
+	}
+
+	images, err := h.querySvc.ListGroupImages(r.Context(), userID, groupID, queryInt(r, "limit", 20), queryInt(r, "offset", 0))
+	if err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: err.Error()})
+		return
+	}
+
+	json.NewEncoder(w).Encode(struct {
+		Status bool                  `json:"status"`
+		Data   []domain.ReceiptImage `json:"data"`
+	}{Status: true, Data: images})
+}
+
+func (h *GroupHandler) ListGroupResults(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: "Only GET is allowed"})
+		return
+	}
+
+	userID, ok := requestUserID(r)
+	if !ok {
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: "Unauthorized"})
+		return
+	}
+
+	groupID, err := nestedGroupIDFromPath(r.URL.Path, "results")
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: "Invalid group ID"})
+		return
+	}
+
+	results, err := h.querySvc.ListGroupResults(r.Context(), userID, groupID, queryInt(r, "limit", 20), queryInt(r, "offset", 0))
+	if err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: err.Error()})
+		return
+	}
+
+	json.NewEncoder(w).Encode(struct {
+		Status bool                   `json:"status"`
+		Data   []domain.OCRExtraction `json:"data"`
+	}{Status: true, Data: results})
+}
+
+func (h *GroupHandler) GetImage(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: "Only GET is allowed"})
+		return
+	}
+
+	userID, ok := requestUserID(r)
+	if !ok {
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: "Unauthorized"})
+		return
+	}
+
+	imageID, err := imageIDFromPath(r.URL.Path)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: "Invalid image ID"})
+		return
+	}
+
+	image, err := h.querySvc.GetImage(r.Context(), userID, imageID)
+	if err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: "Image not found"})
+		return
+	}
+
+	json.NewEncoder(w).Encode(struct {
+		Status bool                 `json:"status"`
+		Data   *domain.ReceiptImage `json:"data"`
+	}{Status: true, Data: image})
+}
+
+func (h *GroupHandler) GetImageResult(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: "Only GET is allowed"})
+		return
+	}
+
+	userID, ok := requestUserID(r)
+	if !ok {
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: "Unauthorized"})
+		return
+	}
+
+	imageID, err := nestedImageIDFromPath(r.URL.Path, "result")
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: "Invalid image ID"})
+		return
+	}
+
+	result, err := h.querySvc.GetImageResult(r.Context(), userID, imageID)
+	if err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: "Result not found"})
+		return
+	}
+
+	json.NewEncoder(w).Encode(struct {
+		Status bool                  `json:"status"`
+		Data   *domain.OCRExtraction `json:"data"`
+	}{Status: true, Data: result})
+}
+
 func requestUserID(r *http.Request) (uuid.UUID, bool) {
 	val := r.Context().Value("user_id")
 	if val == nil {
@@ -265,4 +406,18 @@ func readReceiptFiles(fileHeaders []*multipart.FileHeader) ([]ports.ReceiptFile,
 	}
 
 	return files, nil
+}
+
+func imageIDFromPath(path string) (uuid.UUID, error) {
+	idPart := strings.TrimPrefix(path, "/api/v1/images/")
+	return uuid.Parse(strings.TrimSpace(idPart))
+}
+
+func nestedImageIDFromPath(path string, tail string) (uuid.UUID, error) {
+	trimmed := strings.Trim(path, "/")
+	parts := strings.Split(trimmed, "/")
+	if len(parts) != 5 || parts[4] != tail {
+		return uuid.Nil, fmt.Errorf("invalid nested image path")
+	}
+	return uuid.Parse(parts[3])
 }

@@ -30,6 +30,7 @@ type ReceiptImageRepository interface {
 type OCRExtractionRepository interface {
 	Upsert(ctx context.Context, extraction *domain.OCRExtraction) error
 	GetByReceiptImageID(ctx context.Context, receiptImageID uuid.UUID) (*domain.OCRExtraction, error)
+	ListByGroup(ctx context.Context, userID, groupID uuid.UUID, limit, offset int) ([]domain.OCRExtraction, error)
 }
 
 type OCRJobRepository interface {
@@ -67,6 +68,13 @@ type OCRJobService interface {
 
 type DashboardService interface {
 	GetSummary(ctx context.Context, userID uuid.UUID) (*domain.DashboardSummary, error)
+}
+
+type ReceiptQueryService interface {
+	ListGroupImages(ctx context.Context, userID, groupID uuid.UUID, limit, offset int) ([]domain.ReceiptImage, error)
+	GetImage(ctx context.Context, userID, imageID uuid.UUID) (*domain.ReceiptImage, error)
+	GetImageResult(ctx context.Context, userID, imageID uuid.UUID) (*domain.OCRExtraction, error)
+	ListGroupResults(ctx context.Context, userID, groupID uuid.UUID, limit, offset int) ([]domain.OCRExtraction, error)
 }
 
 type ReceiptFile struct {

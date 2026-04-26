@@ -483,6 +483,39 @@ func (r *ocrExtractionRepo) GetByReceiptImageID(ctx context.Context, receiptImag
 	return &extraction, nil
 }
 
+func (r *ocrExtractionRepo) ListByGroup(ctx context.Context, userID, groupID uuid.UUID, limit, offset int) ([]domain.OCRExtraction, error) {
+	if r.db == nil {
+		return nil, errors.New("database connection is not available")
+	}
+
+	query := `
+		SELECT re.id, re.receipt_image_id, re.success, re.receipt_type, re.fields_json, re.items_json, re.warnings_json,
+		       re.raw_text, re.debug_json, re.ocr_engine_url, re.ocr_engine_version, re.pipeline_version,
+		       re.created_at, re.updated_at
+		FROM receipt_extractions re
+		INNER JOIN receipt_images ri ON ri.id = re.receipt_image_id
+		WHERE ri.user_id = $1 AND ri.group_id = $2
+		ORDER BY re.created_at DESC
+		LIMIT $3 OFFSET $4
+	`
+
+	rows, err := r.db.Query(ctx, query, userID, groupID, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var extractions []domain.OCRExtraction
+	for rows.Next() {
+		extraction, err := scanOCRExtraction(rows)
+		if err != nil {
+			return nil, err
+		}
+		extractions = append(extractions, *extraction)
+	}
+	return extractions, rows.Err()
+}
+
 func (r *ocrJobRepo) CreateMany(ctx context.Context, jobs []ports.OCRJobCreateInput) ([]domain.OCRJob, error) {
 	if r.db == nil {
 		return nil, errors.New("database connection is not available")
@@ -793,6 +826,40 @@ func scanOCRJob(row scanner) (*domain.OCRJob, error) {
 	job.ErrorCode = nullableText(errorCode)
 	job.ErrorMessage = nullableText(errorMessage)
 	return &job, nil
+}
+
+func scanOCRExtraction(row scanner) (*domain.OCRExtraction, error) {
+	var extraction domain.OCRExtraction
+	var receiptType, rawText, ocrEngineURL, ocrEngineVersion, pipelineVersion pgtype.Text
+	var debugJSON []byte
+
+	err := row.Scan(
+		&extraction.ID,
+		&extraction.ReceiptImageID,
+		&extraction.Success,
+		&receiptType,
+		&extraction.FieldsJSON,
+		&extraction.ItemsJSON,
+		&extraction.WarningsJSON,
+		&rawText,
+		&debugJSON,
+		&ocrEngineURL,
+		&ocrEngineVersion,
+		&pipelineVersion,
+		&extraction.CreatedAt,
+		&extraction.UpdatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	extraction.ReceiptType = nullableText(receiptType)
+	extraction.RawText = nullableText(rawText)
+	extraction.DebugJSON = debugJSON
+	extraction.OCREngineURL = nullableText(ocrEngineURL)
+	extraction.OCREngineVersion = nullableText(ocrEngineVersion)
+	extraction.PipelineVersion = nullableText(pipelineVersion)
+	return &extraction, nil
 }
 
 func nullableText(value pgtype.Text) *string {

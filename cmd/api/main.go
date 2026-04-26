@@ -54,9 +54,10 @@ func main() {
 	userSvc := services.NewUserService(userRepo, authAdapter)
 	groupSvc := services.NewReceiptGroupService(groupRepo)
 	uploadSvc := services.NewReceiptUploadService(groupRepo, imageRepo, jobRepo, objectStorageSvc, cfg.OCRGroupMaxFiles, cfg.OCRMaxFileSizeMB)
+	querySvc := services.NewReceiptQueryService(groupRepo, imageRepo, extractionRepo)
 	ocrJobSvc := services.NewOCRJobService(jobRepo, imageRepo, extractionRepo, groupRepo, objectStorageSvc, ocrEngineSvc, cfg.OCREngine.MaxConcurrency)
 	userHandler := handlers.NewUserHandler(userSvc)
-	groupHandler := handlers.NewGroupHandler(groupSvc, uploadSvc)
+	groupHandler := handlers.NewGroupHandler(groupSvc, uploadSvc, querySvc)
 
 	// 3. Initialize Server
 	server := api.NewServer(cfg.Port, userHandler, groupHandler, authAdapter, dbManager.Pool)

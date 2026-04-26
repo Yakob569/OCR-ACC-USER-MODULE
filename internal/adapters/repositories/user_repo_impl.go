@@ -25,10 +25,12 @@ func NewUserRepository(db *pgxpool.Pool) ports.UserRepository {
 }
 
 func (r *userRepo) CreateUser(ctx context.Context, u *domain.User) (*domain.User, error) {
+	log.Printf("➡️  [UserRepo.CreateUser] Attempting to create user with email: %s", u.Email)
 	if r.db == nil {
+		log.Printf("❌ [UserRepo.CreateUser] Database connection is not available for email: %s", u.Email)
 		return nil, errors.New("database connection is not available")
 	}
-	log.Printf("[UserRepo] Executing CreateUser for email: %s", u.Email)
+
 	query := `
 		INSERT INTO users (email, full_name, phone, role, auth_provider, password_hash)
 		VALUES ($1, $2, $3, $4, $5, $6)
@@ -38,6 +40,7 @@ func (r *userRepo) CreateUser(ctx context.Context, u *domain.User) (*domain.User
 	var registered domain.User
 	var phone, avatar pgtype.Text
 
+	log.Printf("ℹ️  [UserRepo.CreateUser] Executing SQL query for email: %s", u.Email)
 	err := r.db.QueryRow(ctx, query,
 		u.Email,
 		u.FullName,
@@ -60,7 +63,7 @@ func (r *userRepo) CreateUser(ctx context.Context, u *domain.User) (*domain.User
 	)
 
 	if err != nil {
-		log.Printf("[UserRepo] CreateUser failed: %v", err)
+		log.Printf("❌ [UserRepo.CreateUser] Failed to create user %s: %v", u.Email, err)
 		return nil, err
 	}
 
@@ -71,15 +74,16 @@ func (r *userRepo) CreateUser(ctx context.Context, u *domain.User) (*domain.User
 		registered.AvatarURL = &avatar.String
 	}
 
-	log.Printf("[UserRepo] CreateUser successful, ID: %s", registered.ID)
+	log.Printf("✅ [UserRepo.CreateUser] User created successfully with ID: %s, Email: %s", registered.ID, registered.Email)
 	return &registered, nil
 }
 
 func (r *userRepo) GetUserByEmail(ctx context.Context, email string) (*domain.User, error) {
+	log.Printf("➡️  [UserRepo.GetUserByEmail] Attempting to fetch user by email: %s", email)
 	if r.db == nil {
+		log.Printf("❌ [UserRepo.GetUserByEmail] Database connection is not available for email: %s", email)
 		return nil, errors.New("database connection is not available")
 	}
-	log.Printf("[UserRepo] Fetching user by email: %s", email)
 	query := `
 		SELECT id, email, password_hash, full_name, phone, role, is_active, email_verified, auth_provider, avatar_url, created_at, updated_at
 		FROM users WHERE email = $1
@@ -88,6 +92,7 @@ func (r *userRepo) GetUserByEmail(ctx context.Context, email string) (*domain.Us
 	var u domain.User
 	var phone, avatar, pwdHash pgtype.Text
 
+	log.Printf("ℹ️  [UserRepo.GetUserByEmail] Executing SQL query for email: %s", email)
 	err := r.db.QueryRow(ctx, query, email).Scan(
 		&u.ID,
 		&u.Email,
@@ -104,7 +109,7 @@ func (r *userRepo) GetUserByEmail(ctx context.Context, email string) (*domain.Us
 	)
 
 	if err != nil {
-		log.Printf("[UserRepo] GetUserByEmail for %s error/not found: %v", email, err)
+		log.Printf("❌ [UserRepo.GetUserByEmail] Failed to fetch user by email %s: %v", email, err)
 		return nil, err
 	}
 
@@ -118,15 +123,16 @@ func (r *userRepo) GetUserByEmail(ctx context.Context, email string) (*domain.Us
 		u.AvatarURL = &avatar.String
 	}
 
-	log.Printf("[UserRepo] Found user: %s (ID: %s)", email, u.ID)
+	log.Printf("✅ [UserRepo.GetUserByEmail] User found with ID: %s, Email: %s", u.ID, u.Email)
 	return &u, nil
 }
 
 func (r *userRepo) GetUserByID(ctx context.Context, id uuid.UUID) (*domain.User, error) {
+	log.Printf("➡️  [UserRepo.GetUserByID] Attempting to fetch user by ID: %s", id)
 	if r.db == nil {
+		log.Printf("❌ [UserRepo.GetUserByID] Database connection is not available for ID: %s", id)
 		return nil, errors.New("database connection is not available")
 	}
-	log.Printf("[UserRepo] Fetching user by ID: %s", id)
 	query := `
 		SELECT id, email, full_name, phone, role, is_active, email_verified, auth_provider, avatar_url, created_at, updated_at
 		FROM users WHERE id = $1
@@ -135,6 +141,7 @@ func (r *userRepo) GetUserByID(ctx context.Context, id uuid.UUID) (*domain.User,
 	var u domain.User
 	var phone, avatar pgtype.Text
 
+	log.Printf("ℹ️  [UserRepo.GetUserByID] Executing SQL query for user ID: %s", id)
 	err := r.db.QueryRow(ctx, query, id).Scan(
 		&u.ID,
 		&u.Email,
@@ -150,7 +157,7 @@ func (r *userRepo) GetUserByID(ctx context.Context, id uuid.UUID) (*domain.User,
 	)
 
 	if err != nil {
-		log.Printf("[UserRepo] GetUserByID failed for %s: %v", id, err)
+		log.Printf("❌ [UserRepo.GetUserByID] Failed to fetch user for ID %s: %v", id, err)
 		return nil, err
 	}
 
@@ -161,37 +168,43 @@ func (r *userRepo) GetUserByID(ctx context.Context, id uuid.UUID) (*domain.User,
 		u.AvatarURL = &avatar.String
 	}
 
-	log.Printf("[UserRepo] Found user: %s for ID: %s", u.Email, id)
+	log.Printf("✅ [UserRepo.GetUserByID] User found with ID: %s, Email: %s", u.ID, u.Email)
 	return &u, nil
 }
 
 func (r *userRepo) StoreRefreshToken(ctx context.Context, userID uuid.UUID, token string, expiresAt time.Time) error {
-	log.Printf("[UserRepo] Storing refresh token for user ID: %s", userID)
+	log.Printf("➡️  [UserRepo.StoreRefreshToken] Attempting to store refresh token for user ID: %s", userID)
 	query := `
 		INSERT INTO refresh_tokens (user_id, token, expires_at)
 		VALUES ($1, $2, $3)
 	`
+	log.Printf("ℹ️  [UserRepo.StoreRefreshToken] Executing SQL query for user ID: %s", userID)
 	_, err := r.db.Exec(ctx, query, userID, token, expiresAt)
 	if err != nil {
-		log.Printf("[UserRepo] StoreRefreshToken failed: %v", err)
+		log.Printf("❌ [UserRepo.StoreRefreshToken] Failed to store refresh token for user ID %s: %v", userID, err)
+		return err
 	}
-	return err
+	log.Printf("✅ [UserRepo.StoreRefreshToken] Refresh token stored successfully for user ID: %s", userID)
+	return nil
 }
 
 func (r *userRepo) RevokeRefreshToken(ctx context.Context, token string) error {
-	log.Printf("[UserRepo] Revoking refresh token")
+	log.Printf("➡️  [UserRepo.RevokeRefreshToken] Attempting to revoke refresh token (truncated): %s...", token[:10])
 	query := `
 		UPDATE refresh_tokens SET revoked = TRUE WHERE token = $1
 	`
+	log.Printf("ℹ️  [UserRepo.RevokeRefreshToken] Executing SQL query to revoke token")
 	_, err := r.db.Exec(ctx, query, token)
 	if err != nil {
-		log.Printf("[UserRepo] RevokeRefreshToken failed: %v", err)
+		log.Printf("❌ [UserRepo.RevokeRefreshToken] Failed to revoke refresh token: %v", err)
+		return err
 	}
-	return err
+	log.Printf("✅ [UserRepo.RevokeRefreshToken] Refresh token revoked successfully")
+	return nil
 }
 
 func (r *userRepo) GetRefreshToken(ctx context.Context, token string) (uuid.UUID, error) {
-	log.Printf("[UserRepo] Validating refresh token")
+	log.Printf("➡️  [UserRepo.GetRefreshToken] Attempting to validate refresh token (truncated): %s...", token[:10])
 	query := `
 		SELECT user_id, expires_at, revoked FROM refresh_tokens WHERE token = $1
 	`
@@ -199,22 +212,23 @@ func (r *userRepo) GetRefreshToken(ctx context.Context, token string) (uuid.UUID
 	var expiresAt time.Time
 	var revoked bool
 
+	log.Printf("ℹ️  [UserRepo.GetRefreshToken] Executing SQL query to fetch refresh token details")
 	err := r.db.QueryRow(ctx, query, token).Scan(&userID, &expiresAt, &revoked)
 	if err != nil {
-		log.Printf("[UserRepo] GetRefreshToken failed (token might not exist): %v", err)
+		log.Printf("❌ [UserRepo.GetRefreshToken] Failed to fetch refresh token details: %v", err)
 		return uuid.Nil, err
 	}
 
 	if revoked {
-		log.Printf("[UserRepo] Refresh token is revoked for user ID: %s", userID)
+		log.Printf("❌ [UserRepo.GetRefreshToken] Refresh token is revoked for user ID: %s", userID)
 		return uuid.Nil, errors.New("token revoked")
 	}
 
 	if time.Now().After(expiresAt) {
-		log.Printf("[UserRepo] Refresh token is expired for user ID: %s", userID)
+		log.Printf("❌ [UserRepo.GetRefreshToken] Refresh token is expired for user ID: %s", userID)
 		return uuid.Nil, errors.New("token expired")
 	}
 
-	log.Printf("[UserRepo] Refresh token is valid for user ID: %s", userID)
+	log.Printf("✅ [UserRepo.GetRefreshToken] Refresh token is valid for user ID: %s", userID)
 	return userID, nil
 }

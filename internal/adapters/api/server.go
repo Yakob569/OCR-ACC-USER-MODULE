@@ -50,18 +50,23 @@ func (s *Server) Shutdown(ctx context.Context) error {
 }
 
 func (s *Server) healthCheck(w http.ResponseWriter, r *http.Request) {
+	log.Printf("➡️  [HealthCheck] Received request from %s", r.RemoteAddr)
 	w.Header().Set("Content-Type", "application/json")
 
 	if s.db == nil {
+		log.Println("❌ [HealthCheck] Database connection pool is nil")
 		w.WriteHeader(http.StatusServiceUnavailable)
 		fmt.Fprintf(w, `{"status":"unhealthy","database":"unavailable"}`)
 		return
 	}
 
 	if err := s.db.Ping(r.Context()); err != nil {
+		log.Printf("❌ [HealthCheck] Database ping failed: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		fmt.Fprintf(w, `{"status":"unhealthy","database":"disconnected"}`)
 		return
 	}
+	log.Println("✅ [HealthCheck] Database connected successfully")
 	fmt.Fprintf(w, `{"status":"healthy","database":"connected"}`)
+	log.Println("⬅️  [HealthCheck] Responded with healthy status")
 }

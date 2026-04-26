@@ -30,10 +30,18 @@ func (a *jwtAuthAdapter) HashPassword(password string) (string, error) {
 }
 
 func (a *jwtAuthAdapter) ComparePassword(password, hash string) error {
-	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
+	log.Printf("➡️  [JWTAuthAdapter.ComparePassword] Attempting to compare password with hash")
+	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
+	if err != nil {
+		log.Printf("❌ [JWTAuthAdapter.ComparePassword] Password comparison failed: %v", err)
+		return err
+	}
+	log.Printf("✅ [JWTAuthAdapter.ComparePassword] Password comparison successful")
+	return nil
 }
 
 func (a *jwtAuthAdapter) GenerateTokenPair(user *domain.User) (*domain.TokenPair, error) {
+	log.Printf("➡️  [JWTAuthAdapter.GenerateTokenPair] Attempting to generate token pair for user ID: %s", user.ID)
 	now := time.Now()
 
 	// Access Token
@@ -49,8 +57,11 @@ func (a *jwtAuthAdapter) GenerateTokenPair(user *domain.User) (*domain.TokenPair
 	accessToken := jwt.NewWithClaims(jwt.SigningMethodHS256, accessClaims)
 	accessStr, err := accessToken.SignedString(a.secretKey)
 	if err != nil {
+		log.Printf("❌ [JWTAuthAdapter.GenerateTokenPair] Failed to sign access token for user ID %s: %v", user.ID, err)
 		return nil, err
 	}
+	log.Printf("✅ [JWTAuthAdapter.GenerateTokenPair] Access token generated for user ID: %s", user.ID)
+
 
 	// Refresh Token (simplified for this implementation, just a random UUID or longer JWT)
 	refreshClaims := jwt.MapClaims{
@@ -62,9 +73,13 @@ func (a *jwtAuthAdapter) GenerateTokenPair(user *domain.User) (*domain.TokenPair
 	refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, refreshClaims)
 	refreshStr, err := refreshToken.SignedString(a.secretKey)
 	if err != nil {
+		log.Printf("❌ [JWTAuthAdapter.GenerateTokenPair] Failed to sign refresh token for user ID %s: %v", user.ID, err)
 		return nil, err
 	}
+	log.Printf("✅ [JWTAuthAdapter.GenerateTokenPair] Refresh token generated for user ID: %s", user.ID)
 
+
+	log.Printf("⬅️  [JWTAuthAdapter.GenerateTokenPair] Token pair generated successfully for user ID: %s", user.ID)
 	return &domain.TokenPair{
 		AccessToken:  accessStr,
 		RefreshToken: refreshStr,

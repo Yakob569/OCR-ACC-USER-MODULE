@@ -34,3 +34,6 @@ type_check
 # Supabase
 supabase/.temp/
 
+.env
+venv/
+.DS_Store

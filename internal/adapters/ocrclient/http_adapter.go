@@ -25,7 +25,9 @@ type httpOCREngineService struct {
 type ocrEngineResponse struct {
 	Success     bool            `json:"success"`
 	ReceiptType string          `json:"receipt_type"`
-	Fields      json.RawMessage `json:"fields"`
+	Merchant    json.RawMessage `json:"merchant"`
+	Transaction json.RawMessage `json:"transaction"`
+	Totals      json.RawMessage `json:"totals"`
 	Items       json.RawMessage `json:"items"`
 	Warnings    json.RawMessage `json:"warnings"`
 	RawText     *string         `json:"raw_text"`
@@ -66,7 +68,7 @@ func (s *httpOCREngineService) Extract(ctx context.Context, filename, contentTyp
 		return nil, err
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.baseURL+"/api/v1/ocr/extract", &body)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.baseURL+"/api/v1/extract", &body)
 	if err != nil {
 		return nil, err
 	}
@@ -107,17 +109,41 @@ func (s *httpOCREngineService) Extract(ctx context.Context, filename, contentTyp
 		return nil, err
 	}
 
+	// Merge Merchant, Transaction, and Totals into a single Fields map
+	mergedFields := make(map[string]json.RawMessage)
+	
+	if len(payload.Merchant) > 2 { // > 2 to ignore empty "{}"
+		var m map[string]json.RawMessage
+		if err := json.Unmarshal(payload.Merchant, &m); err == nil {
+			for k, v := range m { mergedFields[k] = v }
+		}
+	}
+	if len(payload.Transaction) > 2 {
+		var t map[string]json.RawMessage
+		if err := json.Unmarshal(payload.Transaction, &t); err == nil {
+			for k, v := range t { mergedFields[k] = v }
+		}
+	}
+	if len(payload.Totals) > 2 {
+		var tt map[string]json.RawMessage
+		if err := json.Unmarshal(payload.Totals, &tt); err == nil {
+			for k, v := range tt { mergedFields[k] = v }
+		}
+	}
+
+	fieldsJSON, _ := json.Marshal(mergedFields)
+
 	rawTextLen := 0
 	if payload.RawText != nil {
 		rawTextLen = len(*payload.RawText)
 	}
-	log.Printf("[OCREngineHTTP] response url=%s status=%d duration_ms=%d success=%t receipt_type=%q fields_bytes=%d items_bytes=%d warnings_bytes=%d debug_bytes=%d raw_text_len=%d", req.URL.String(), resp.StatusCode, time.Since(start).Milliseconds(), payload.Success, payload.ReceiptType, len(payload.Fields), len(payload.Items), len(payload.Warnings), len(payload.Debug), rawTextLen)
+	log.Printf("[OCREngineHTTP] response url=%s status=%d duration_ms=%d success=%t receipt_type=%q fields_merged=%d items_bytes=%d warnings_bytes=%d debug_bytes=%d raw_text_len=%d", req.URL.String(), resp.StatusCode, time.Since(start).Milliseconds(), payload.Success, payload.ReceiptType, len(mergedFields), len(payload.Items), len(payload.Warnings), len(payload.Debug), rawTextLen)
 
 	receiptType := stringPtrIfNonEmpty(payload.ReceiptType)
 	extraction := &domain.OCRExtraction{
 		Success:      payload.Success,
 		ReceiptType:  receiptType,
-		FieldsJSON:   normalizeJSON(payload.Fields, []byte(`{}`)),
+		FieldsJSON:   normalizeJSON(fieldsJSON, []byte(`{}`)),
 		ItemsJSON:    normalizeJSON(payload.Items, []byte(`[]`)),
 		WarningsJSON: normalizeJSON(payload.Warnings, []byte(`[]`)),
 		RawText:      payload.RawText,
@@ -129,7 +155,7 @@ func (s *httpOCREngineService) Extract(ctx context.Context, filename, contentTyp
 		status = domain.OCRStatusNeedsReview
 	}
 
-	confidence := deriveOverallConfidence(payload.Fields, payload.Items)
+	confidence := deriveOverallConfidence(fieldsJSON, payload.Items)
 	return &domain.OCRProcessResult{
 		Extraction:  extraction,
 		OCRStatus:   status,

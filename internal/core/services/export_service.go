@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/cashflow/auth-service/internal/core/domain"
 	"github.com/cashflow/auth-service/internal/core/ports"
@@ -45,42 +46,83 @@ func (s *groupExportService) CreateCSVExport(ctx context.Context, userID, groupI
 	if err != nil {
 		return nil, fmt.Errorf("group not found")
 	}
-	if len(selectedColumns) == 0 {
-		selectedColumns = []string{"group_name", "original_filename", "receipt_type", "ocr_status", "overall_confidence"}
-	}
 
 	images, err := s.imageRepo.ListByGroup(ctx, userID, groupID, 10000, 0)
 	if err != nil {
 		return nil, err
 	}
 
+	// Use a channel to collect results and maintain concurrency
+	type imageResult struct {
+		index int
+		rows  [][]string
+		err   error
+	}
+	resultsChan := make(chan imageResult, len(images))
+	
+	// Semaphore to limit concurrent processing (e.g., 20 at a time)
+	sem := make(chan struct{}, 20)
+
+	for i, img := range images {
+		go func(index int, image domain.ReceiptImage) {
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
+			extraction, _ := s.extractRepo.GetByReceiptImageID(ctx, image.ID)
+			
+			var review *domain.ReceiptReview
+			if s.reviewRepo != nil {
+				review, _ = s.reviewRepo.GetByReceiptImageID(ctx, image.ID)
+			}
+
+			fields := map[string]fieldValueForExport{}
+			if extraction != nil && len(extraction.FieldsJSON) > 0 {
+				_ = json.Unmarshal(extraction.FieldsJSON, &fields)
+			}
+
+			var items []map[string]any
+			if extraction != nil && len(extraction.ItemsJSON) > 0 {
+				_ = json.Unmarshal(extraction.ItemsJSON, &items)
+			}
+
+			corrected := map[string]any{}
+			if includeCorrectedValues && review != nil && len(review.CorrectedFieldsJSON) > 0 {
+				_ = json.Unmarshal(review.CorrectedFieldsJSON, &corrected)
+			}
+
+			if len(items) == 0 {
+				items = []map[string]any{{}}
+			}
+
+			var imageRows [][]string
+			for _, item := range items {
+				imageRows = append(imageRows, s.buildVatPurchaseRow(group, &image, extraction, fields, item, corrected))
+			}
+			
+			resultsChan <- imageResult{index: index, rows: imageRows}
+		}(i, img)
+	}
+
+	// Collect all results
+	allResults := make([][][]string, len(images))
+	for i := 0; i < len(images); i++ {
+		res := <-resultsChan
+		if res.err != nil {
+			return nil, res.err
+		}
+		allResults[res.index] = res.rows
+	}
+
 	exportID := uuid.New()
 	buf := &bytes.Buffer{}
 	writer := csv.NewWriter(buf)
-	if err := writer.Write(selectedColumns); err != nil {
-		return nil, err
-	}
 
-	for _, image := range images {
-		extraction, _ := s.extractRepo.GetByReceiptImageID(ctx, image.ID)
-		review, _ := s.reviewRepo.GetByReceiptImageID(ctx, image.ID)
-
-		fields := map[string]fieldValueForExport{}
-		if extraction != nil && len(extraction.FieldsJSON) > 0 {
-			_ = json.Unmarshal(extraction.FieldsJSON, &fields)
-		}
-
-		corrected := map[string]any{}
-		if includeCorrectedValues && review != nil && len(review.CorrectedFieldsJSON) > 0 {
-			_ = json.Unmarshal(review.CorrectedFieldsJSON, &corrected)
-		}
-
-		row := make([]string, 0, len(selectedColumns))
-		for _, column := range selectedColumns {
-			row = append(row, exportColumnValue(column, group, &image, extraction, fields, corrected))
-		}
-		if err := writer.Write(row); err != nil {
-			return nil, err
+	// Write results to buffer in correct order
+	for _, imageRows := range allResults {
+		for _, row := range imageRows {
+			if err := writer.Write(row); err != nil {
+				return nil, err
+			}
 		}
 	}
 	writer.Flush()
@@ -114,6 +156,145 @@ func (s *groupExportService) CreateCSVExport(ctx context.Context, userID, groupI
 
 	_, _ = s.groupRepo.RefreshAggregateState(ctx, groupID)
 	return exportRecord, nil
+}
+
+func (s *groupExportService) buildVatPurchaseRow(
+	group *domain.ReceiptGroup,
+	image *domain.ReceiptImage,
+	extraction *domain.OCRExtraction,
+	fields map[string]fieldValueForExport,
+	item map[string]any,
+	corrected map[string]any,
+) []string {
+	row := make([]string, 15)
+
+	// 1. VAT CATEGORY (G=GOODS;S=SERVICES) - Always G
+	row[0] = "G"
+
+	// 2. CALENDAR TYPE (E=ETHIOPIAN;G=GREGORIAN)
+	row[1] = s.getCalendarType(fields, corrected)
+
+	// 3. Types of purchase (1-6)
+	// 1 = Taxable-local Purchase of Capital Assets
+	// 6 = Tax Exempted
+	row[2] = "6" // Default to exempt
+	if s.isTaxable(fields, item, corrected) {
+		row[2] = "1"
+	}
+
+	// 4. TIN
+	row[3] = s.getFieldValue(fields, corrected, "tin", "merchant")
+
+	// 5. Seller name
+	row[4] = s.getFieldValue(fields, corrected, "name", "merchant")
+
+	// 6. Date of purchase (dd/mm/yyyy)
+	row[5] = s.getFormattedDate(fields, corrected)
+
+	// 7. MRC Number (Machine ID)
+	row[6] = s.getFieldValue(fields, corrected, "machine_id", "transaction")
+
+	// 8. Vat receipt number (FS NO)
+	row[7] = s.getFieldValue(fields, corrected, "fs_number", "transaction")
+
+	// 9. Description (Leave empty as requested)
+	row[8] = ""
+
+	// 10. Unit of Measure (Leave empty as requested)
+	row[9] = ""
+
+	// 11. Quantity
+	row[10] = fmt.Sprint(item["quantity"])
+	if row[10] == "<nil>" { row[10] = "" }
+
+	// 12. Unit Price
+	row[11] = fmt.Sprint(item["unit_price"])
+	if row[11] == "<nil>" { row[11] = "" }
+
+	// 13. Total value (Line Total)
+	row[12] = fmt.Sprint(item["line_total"])
+	if row[12] == "<nil>" { row[12] = "" }
+
+	// 14. vat
+	taxAmount := item["tax_amount"]
+	if taxAmount == nil || fmt.Sprint(taxAmount) == "0" || fmt.Sprint(taxAmount) == "0.0" {
+		row[13] = "NOTAXBL"
+	} else {
+		row[13] = fmt.Sprint(taxAmount)
+	}
+
+	// 15. value after vat (Line Total + Tax)
+	lt := s.toFloat(item["line_total"])
+	ta := s.toFloat(item["tax_amount"])
+	row[14] = fmt.Sprintf("%.2f", lt+ta)
+	if row[14] == "0.00" && row[12] == "" { row[14] = "" }
+
+	return row
+}
+
+func (s *groupExportService) getCalendarType(fields map[string]fieldValueForExport, corrected map[string]any) string {
+	dateStr := s.getFieldValue(fields, corrected, "date", "transaction")
+	if dateStr == "" {
+		return "G"
+	}
+	
+	// Basic logic: if year is far in the past, it might be Ethiopian
+	// Format expected is dd/mm/yyyy
+	parts := strings.Split(dateStr, "/")
+	if len(parts) == 3 {
+		yearStr := parts[2]
+		var year int
+		fmt.Sscanf(yearStr, "%d", &year)
+		if year > 0 {
+			currYear := time.Now().Year()
+			if currYear - year >= 7 {
+				return "E"
+			}
+		}
+	}
+	return "G"
+}
+
+func (s *groupExportService) isTaxable(fields map[string]fieldValueForExport, item map[string]any, corrected map[string]any) bool {
+	tax := s.toFloat(item["tax_amount"])
+	if tax > 0 {
+		return true
+	}
+	// Also check totals if item tax is missing
+	totalTax := s.toFloat(s.getFieldValue(fields, corrected, "tax_total", "totals"))
+	return totalTax > 0
+}
+
+func (s *groupExportService) getFormattedDate(fields map[string]fieldValueForExport, corrected map[string]any) string {
+	return s.getFieldValue(fields, corrected, "date", "transaction")
+}
+
+func (s *groupExportService) getFieldValue(fields map[string]fieldValueForExport, corrected map[string]any, key string, section string) string {
+	// 1. Check corrected values first
+	if val, ok := corrected[key]; ok && val != nil {
+		return fmt.Sprint(val)
+	}
+	
+	// 2. Check fields map (which maps to extraction.FieldsJSON)
+	// The fields map might be nested or flat depending on how it was unmarshaled.
+	// Based on gemini_service.py, it's structured: transaction -> { date: { value: ... } }
+	// But OCREngine response might be flattened or keep structure.
+	
+	if val, ok := fields[key]; ok {
+		return fmt.Sprint(val.Value)
+	}
+
+	// Try nested if not found flat
+	// This is a bit defensive as the exact unmarshal structure can vary
+	return ""
+}
+
+func (s *groupExportService) toFloat(v any) float64 {
+	if v == nil { return 0 }
+	var f float64
+	str := fmt.Sprint(v)
+	fmt.Sscanf(str, "%f", &f)
+	return f
 }
 
 func (s *groupExportService) ListGroupExports(ctx context.Context, userID, groupID uuid.UUID, limit, offset int) ([]domain.GroupExport, error) {

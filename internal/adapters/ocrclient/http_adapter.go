@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -84,7 +85,13 @@ func (s *httpOCREngineService) Extract(ctx context.Context, filename, contentTyp
 
 	resp, err := s.client.Do(req)
 	if err != nil {
-		log.Printf("[OCREngineHTTP] error url=%s duration_ms=%d err=%v", req.URL.String(), time.Since(start).Milliseconds(), err)
+		if errors.Is(err, context.DeadlineExceeded) {
+			log.Printf("[OCREngineHTTP] ❌ Request timed out after %s. Possible Render timeout.", time.Since(start))
+		} else if strings.Contains(err.Error(), "connection reset") {
+			log.Printf("[OCREngineHTTP] ❌ Connection was reset by the server/proxy (Render).")
+		} else {
+			log.Printf("[OCREngineHTTP] ❌ Request failed: %v", err)
+		}
 		return nil, err
 	}
 	defer resp.Body.Close()

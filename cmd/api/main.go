@@ -37,13 +37,17 @@ func main() {
 		resp, err := http.Get(cfg.OCREngine.BaseURL + "/health")
 		if err != nil {
 			log.Printf("❌ [Cron] OCR health ping failed: %v", err)
-			return
+		} else {
+			defer resp.Body.Close()
+			log.Printf("✅ [Cron] OCR health ping status: %d", resp.StatusCode)
 		}
-		defer resp.Body.Close()
-		log.Printf("✅ [Cron] OCR health ping status: %d", resp.StatusCode)
+		next := c.Entries()[0].Next
+		log.Printf("⏭️  [Cron] Next OCR health ping scheduled at: %v", next.Format("2006-01-02 15:04:05"))
 	})
 	c.Start()
 	defer c.Stop()
+	
+	log.Printf("⏭️  [Cron] OCR health ping initially scheduled at: %v", c.Entries()[0].Next.Format("2006-01-02 15:04:05"))
 
 	dbManager := repositories.NewDatabaseManager(ctx, cfg.DatabaseURL, cfg.DBUser, cfg.DBPass, cfg.DBHost, cfg.DBPort, cfg.DBName)
 	defer func() {

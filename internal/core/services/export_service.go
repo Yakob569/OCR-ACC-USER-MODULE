@@ -63,17 +63,14 @@ func (s *groupExportService) CreateCSVExport(ctx context.Context, userID, groupI
 	// Semaphore to limit concurrent processing (e.g., 20 at a time)
 	sem := make(chan struct{}, 20)
 
-	for i, img := range images {
-		go func(index int, image domain.ReceiptImage) {
-			sem <- struct{}{}
-			defer func() { <-sem }()
+	for i, image := range images {
+		// Only process images with successful OCR
+		if image.OCRStatus != domain.OCRStatusCompleted {
+			continue
+		}
 
-			extraction, _ := s.extractRepo.GetByReceiptImageID(ctx, image.ID)
-			
-			var review *domain.ReceiptReview
-			if s.reviewRepo != nil {
-				review, _ = s.reviewRepo.GetByReceiptImageID(ctx, image.ID)
-			}
+		extraction, _ := s.extractRepo.GetByReceiptImageID(ctx, image.ID)
+		review, _ := s.reviewRepo.GetByReceiptImageID(ctx, image.ID)
 
 			fields := map[string]fieldValueForExport{}
 			if extraction != nil && len(extraction.FieldsJSON) > 0 {

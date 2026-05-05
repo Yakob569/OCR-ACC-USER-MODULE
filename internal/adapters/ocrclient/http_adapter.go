@@ -68,10 +68,13 @@ func (s *httpOCREngineService) Extract(ctx context.Context, filename, contentTyp
 		return nil, err
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.baseURL+"/api/v1/extract", &body)
+	fullURL := s.baseURL + "/api/v1/extract"
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fullURL, &body)
 	if err != nil {
 		return nil, err
 	}
+	
+	log.Printf("[OCREngineHTTP] Attempting POST request to: %s", fullURL)
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 	if contentType != "" {
 		req.Header.Set("X-Original-Content-Type", contentType)

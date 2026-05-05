@@ -17,6 +17,7 @@ import (
 	"github.com/cashflow/auth-service/internal/adapters/storage"
 	"github.com/cashflow/auth-service/internal/config"
 	"github.com/cashflow/auth-service/internal/core/services"
+	"github.com/robfig/cron/v3"
 )
 
 func main() {
@@ -28,6 +29,21 @@ func main() {
 	// 1. Initialize Database
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+
+	// Cron for keeping OCR engine alive
+	c := cron.New()
+	_, _ = c.AddFunc("*/5 * * * *", func() {
+		log.Println("⏱️  [Cron] Pinging OCR engine health...")
+		resp, err := http.Get(cfg.OCREngine.BaseURL + "/health")
+		if err != nil {
+			log.Printf("❌ [Cron] OCR health ping failed: %v", err)
+			return
+		}
+		defer resp.Body.Close()
+		log.Printf("✅ [Cron] OCR health ping status: %d", resp.StatusCode)
+	})
+	c.Start()
+	defer c.Stop()
 
 	dbManager := repositories.NewDatabaseManager(ctx, cfg.DatabaseURL, cfg.DBUser, cfg.DBPass, cfg.DBHost, cfg.DBPort, cfg.DBName)
 	defer func() {

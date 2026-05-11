@@ -79,14 +79,6 @@ func (s *groupExportService) CreateCSVExport(ctx context.Context, userID, groupI
 				resultsChan <- imageResult{index: idx, err: err}
 				return
 			}
-			var review *domain.ReceiptReview
-			if s.reviewRepo != nil {
-				review, err = s.reviewRepo.GetByReceiptImageID(ctx, img.ID)
-				if err != nil {
-					resultsChan <- imageResult{index: idx, err: err}
-					return
-				}
-			}
 
 			fields := map[string]fieldValueForExport{}
 			if extraction != nil && len(extraction.FieldsJSON) > 0 {
@@ -98,18 +90,13 @@ func (s *groupExportService) CreateCSVExport(ctx context.Context, userID, groupI
 				_ = json.Unmarshal(extraction.ItemsJSON, &items)
 			}
 
-			corrected := map[string]any{}
-			if includeCorrectedValues && review != nil && len(review.CorrectedFieldsJSON) > 0 {
-				_ = json.Unmarshal(review.CorrectedFieldsJSON, &corrected)
-			}
-
 			if len(items) == 0 {
 				items = []map[string]any{{}}
 			}
 
 			var imageRows [][]string
 			for _, item := range items {
-				imageRows = append(imageRows, s.buildVatPurchaseRow(group, &img, extraction, fields, item, corrected))
+				imageRows = append(imageRows, s.buildVatPurchaseRow(group, &img, extraction, fields, item))
 			}
 			
 			resultsChan <- imageResult{index: idx, rows: imageRows}
@@ -132,9 +119,9 @@ func (s *groupExportService) CreateCSVExport(ctx context.Context, userID, groupI
 
 	// Write headers
 	headers := []string{
-		"VAT CATEGORY", "CALENDAR TYPE", "Types Of purchase", "TIN.", "Seller Name ",
+		"VAT \nCATEGORY", "CALENDAR\n TYPE", "Types \nOf purchase", "TIN.", "Seller Name ",
 		"Date Of Purchase", "MRC Number", "Vat receipt number", "Description.",
-		"Unit of Measure ", "Quantity.", "Unit Price.", "Total value", "vat", "value After vat",
+		"Unit of \nMeasure ", "Quantity.", "Unit Price.", "Total value", "vat", "value \nAfter vat",
 		"", "", "",
 	}
 	if err := writer.Write(headers); err != nil {
@@ -188,7 +175,6 @@ func (s *groupExportService) buildVatPurchaseRow(
 	extraction *domain.OCRExtraction,
 	fields map[string]fieldValueForExport,
 	item map[string]any,
-	corrected map[string]any,
 ) []string {
 	row := make([]string, 18)
 
@@ -202,26 +188,34 @@ func (s *groupExportService) buildVatPurchaseRow(
 	row[2] = "5"
 
 	// 4. TIN
-	row[3] = s.getFieldValue(fields, corrected, "tin", "merchant")
+	row[3] = s.getFieldValue(fields, "tin", "merchant")
 
 	// 5. Seller name
-	row[4] = s.getFieldValue(fields, corrected, "name", "merchant")
+	row[4] = s.getFieldValue(fields, "name", "merchant")
 
 	// 6. Date of purchase (dd/mm/yyyy)
-	row[5] = s.getFormattedDate(fields, corrected)
+	row[5] = s.getFormattedDate(fields)
 
 	// 7. MRC Number (Machine ID)
-	row[6] = s.getFieldValue(fields, corrected, "machine_id", "transaction")
+	row[6] = s.getFieldValue(fields, "machine_id", "transaction")
 
 	// 8. Vat receipt number (FS NO)
-	row[7] = s.getFieldValue(fields, corrected, "fs_number", "transaction")
+	fsNo := s.getFieldValue(fields, "fs_number", "transaction")
+	if fsNo == "" {
+		fsNo = s.getFieldValue(fields, "invoice_number", "transaction")
+	}
+	row[7] = fsNo
 
 	// 9. Description
 	row[8] = fmt.Sprint(item["description"])
 	if row[8] == "<nil>" { row[8] = "" }
 
-	// 10. Unit of Measure - Forced to 7
-	row[9] = "7"
+	// 10. Unit of Measure - Use 7 or 9 based on content if possible, default to 7
+	row[9] = "7" 
+	desc := strings.ToLower(row[8])
+	if strings.Contains(desc, "transport") || strings.Contains(desc, "lime") || strings.Contains(desc, "dolomite") || strings.Contains(desc, "utility") || strings.Contains(desc, "marble") {
+		row[9] = "9"
+	}
 
 	// 11. Quantity
 	row[10] = fmt.Sprint(item["quantity"])
@@ -238,7 +232,7 @@ func (s *groupExportService) buildVatPurchaseRow(
 	// 14. vat
 	taxAmount := item["tax_amount"]
 	if taxAmount == nil || fmt.Sprint(taxAmount) == "0" || fmt.Sprint(taxAmount) == "0.0" {
-		row[13] = "0" // Changed from NOTAXBL to 0 as per template examples
+		row[13] = "0"
 	} else {
 		row[13] = fmt.Sprint(taxAmount)
 	}
@@ -257,12 +251,12 @@ func (s *groupExportService) buildVatPurchaseRow(
 	return row
 }
 
-func (s *groupExportService) getCalendarType(fields map[string]fieldValueForExport, corrected map[string]any) string {
-	dateStr := s.getFieldValue(fields, corrected, "date", "transaction")
+func (s *groupExportService) getCalendarType(fields map[string]fieldValueForExport) string {
+	dateStr := s.getFieldValue(fields, "date", "transaction")
 	if dateStr == "" {
 		return "G"
 	}
-	
+
 	// Basic logic: if year is far in the past, it might be Ethiopian
 	// Format expected is dd/mm/yyyy
 	parts := strings.Split(dateStr, "/")
@@ -280,31 +274,26 @@ func (s *groupExportService) getCalendarType(fields map[string]fieldValueForExpo
 	return "G"
 }
 
-func (s *groupExportService) isTaxable(fields map[string]fieldValueForExport, item map[string]any, corrected map[string]any) bool {
+func (s *groupExportService) isTaxable(fields map[string]fieldValueForExport, item map[string]any) bool {
 	tax := s.toFloat(item["tax_amount"])
 	if tax > 0 {
 		return true
 	}
 	// Also check totals if item tax is missing
-	totalTax := s.toFloat(s.getFieldValue(fields, corrected, "tax_total", "totals"))
+	totalTax := s.toFloat(s.getFieldValue(fields, "tax_total", "totals"))
 	return totalTax > 0
 }
 
-func (s *groupExportService) getFormattedDate(fields map[string]fieldValueForExport, corrected map[string]any) string {
-	return s.getFieldValue(fields, corrected, "date", "transaction")
+func (s *groupExportService) getFormattedDate(fields map[string]fieldValueForExport) string {
+	return s.getFieldValue(fields, "date", "transaction")
 }
 
-func (s *groupExportService) getFieldValue(fields map[string]fieldValueForExport, corrected map[string]any, key string, section string) string {
-	// 1. Check corrected values first
-	if val, ok := corrected[key]; ok && val != nil {
-		return fmt.Sprint(val)
-	}
-	
-	// 2. Check fields map (which maps to extraction.FieldsJSON)
+func (s *groupExportService) getFieldValue(fields map[string]fieldValueForExport, key string, section string) string {
+	// 1. Check fields map (which maps to extraction.FieldsJSON)
 	// The fields map might be nested or flat depending on how it was unmarshaled.
 	// Based on gemini_service.py, it's structured: transaction -> { date: { value: ... } }
 	// But OCREngine response might be flattened or keep structure.
-	
+
 	if val, ok := fields[key]; ok {
 		return fmt.Sprint(val.Value)
 	}
@@ -313,7 +302,6 @@ func (s *groupExportService) getFieldValue(fields map[string]fieldValueForExport
 	// This is a bit defensive as the exact unmarshal structure can vary
 	return ""
 }
-
 func (s *groupExportService) toFloat(v any) float64 {
 	if v == nil { return 0 }
 	var f float64

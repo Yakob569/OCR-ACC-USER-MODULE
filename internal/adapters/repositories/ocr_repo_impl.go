@@ -8,6 +8,7 @@ import (
 	"github.com/cashflow/auth-service/internal/core/domain"
 	"github.com/cashflow/auth-service/internal/core/ports"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -99,6 +100,9 @@ func (r *receiptGroupRepo) Create(ctx context.Context, input domain.CreateReceip
 		&group.UpdatedAt,
 	)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
 		return nil, err
 	}
 
@@ -122,6 +126,9 @@ func (r *receiptGroupRepo) ListByUser(ctx context.Context, userID uuid.UUID, lim
 
 	rows, err := r.db.Query(ctx, query, userID, limit, offset)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
 		return nil, err
 	}
 	defer rows.Close()
@@ -191,6 +198,9 @@ func (r *receiptGroupRepo) getOne(ctx context.Context, query string, args ...any
 		&group.UpdatedAt,
 	)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
 		return nil, err
 	}
 
@@ -252,6 +262,9 @@ func (r *receiptGroupRepo) RefreshAggregateState(ctx context.Context, id uuid.UU
 		domain.ReviewStatusRejected,
 	).Scan(&total, &queued, &processing, &completed, &failed, &reviewed, &exports)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
 		return nil, err
 	}
 
@@ -286,6 +299,9 @@ func (r *receiptGroupRepo) RefreshAggregateState(ctx context.Context, id uuid.UU
 		WHERE id = $1
 	`, id, status, total, queued, processing, completed, failed, reviewed, exports)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
 		return nil, err
 	}
 
@@ -302,6 +318,9 @@ func (r *receiptImageRepo) CreateMany(ctx context.Context, inputs []domain.Recei
 
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
 		return nil, err
 	}
 	defer tx.Rollback(ctx)
@@ -400,6 +419,9 @@ func (r *receiptImageRepo) ListByGroup(ctx context.Context, userID, groupID uuid
 
 	rows, err := r.db.Query(ctx, query, userID, groupID, limit, offset)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
 		return nil, err
 	}
 	defer rows.Close()
@@ -440,6 +462,9 @@ func (r *receiptImageRepo) getOne(ctx context.Context, query string, args ...any
 	row := r.db.QueryRow(ctx, query, args...)
 	image, err := scanReceiptImage(row)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
 		return nil, err
 	}
 	return image, nil
@@ -560,6 +585,9 @@ func (r *ocrExtractionRepo) GetByReceiptImageID(ctx context.Context, receiptImag
 		&extraction.UpdatedAt,
 	)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
 		return nil, err
 	}
 
@@ -590,6 +618,9 @@ func (r *ocrExtractionRepo) ListByGroup(ctx context.Context, userID, groupID uui
 
 	rows, err := r.db.Query(ctx, query, userID, groupID, limit, offset)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
 		return nil, err
 	}
 	defer rows.Close()
@@ -615,6 +646,9 @@ func (r *ocrJobRepo) CreateMany(ctx context.Context, jobs []ports.OCRJobCreateIn
 
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
 		return nil, err
 	}
 	defer tx.Rollback(ctx)
@@ -702,6 +736,9 @@ func (r *ocrJobRepo) ListQueued(ctx context.Context, limit int) ([]domain.OCRJob
 
 	rows, err := r.db.Query(ctx, query, domain.JobStatusQueued, domain.JobStatusRetrying, limit)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
 		return nil, err
 	}
 	defer rows.Close()
@@ -728,6 +765,9 @@ func (r *ocrJobRepo) ClaimQueued(ctx context.Context, workerID string, limit int
 
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
 		return nil, err
 	}
 	defer tx.Rollback(ctx)
@@ -759,6 +799,9 @@ func (r *ocrJobRepo) ClaimQueued(ctx context.Context, workerID string, limit int
 		workerID,
 	)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
 		return nil, err
 	}
 	defer rows.Close()
@@ -871,6 +914,9 @@ func scanReceiptImage(row scanner) (*domain.ReceiptImage, error) {
 		&image.UpdatedAt,
 	)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
 		return nil, err
 	}
 
@@ -906,6 +952,9 @@ func scanOCRJob(row scanner) (*domain.OCRJob, error) {
 		&job.UpdatedAt,
 	)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
 		return nil, err
 	}
 
@@ -939,6 +988,9 @@ func scanOCRExtraction(row scanner) (*domain.OCRExtraction, error) {
 		&extraction.UpdatedAt,
 	)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
 		return nil, err
 	}
 
@@ -1037,6 +1089,9 @@ func (r *dashboardRepo) GetSummary(ctx context.Context, userID uuid.UUID) (*doma
 		LIMIT 5
 	`, userID)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
 		return nil, err
 	}
 	defer groupRows.Close()
@@ -1077,6 +1132,9 @@ func (r *dashboardRepo) GetSummary(ctx context.Context, userID uuid.UUID) (*doma
 		LIMIT 10
 	`, userID)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
 		return nil, err
 	}
 	defer imageRows.Close()
@@ -1127,6 +1185,9 @@ func (r *receiptReviewRepo) Create(ctx context.Context, input domain.SubmitRecei
 		&review.CreatedAt,
 	)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
 		return nil, err
 	}
 	review.ReviewNotes = nullableText(notes)
@@ -1161,6 +1222,9 @@ func (r *receiptReviewRepo) GetByReceiptImageID(ctx context.Context, receiptImag
 		&review.CreatedAt,
 	)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
 		return nil, err
 	}
 	review.ReviewNotes = nullableText(notes)
@@ -1205,6 +1269,9 @@ func (r *groupExportRepo) Create(ctx context.Context, input domain.CreateGroupEx
 		&export.CreatedAt,
 	)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
 		return nil, err
 	}
 	export.StorageBucket = nullableText(bucket)
@@ -1230,6 +1297,9 @@ func (r *groupExportRepo) ListByGroup(ctx context.Context, userID, groupID uuid.
 
 	rows, err := r.db.Query(ctx, query, userID, groupID, limit, offset)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
 		return nil, err
 	}
 	defer rows.Close()

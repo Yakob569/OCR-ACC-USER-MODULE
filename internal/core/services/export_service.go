@@ -64,13 +64,29 @@ func (s *groupExportService) CreateCSVExport(ctx context.Context, userID, groupI
 	sem := make(chan struct{}, 20)
 
 	for i, image := range images {
-		// Only process images with successful OCR
-		if image.OCRStatus != domain.OCRStatusCompleted {
-			continue
-		}
+		go func(idx int, img domain.ReceiptImage) {
+			sem <- struct{}{}
+			defer func() { <-sem }()
 
-		extraction, _ := s.extractRepo.GetByReceiptImageID(ctx, image.ID)
-		review, _ := s.reviewRepo.GetByReceiptImageID(ctx, image.ID)
+			// Only process images with successful OCR
+			if img.OCRStatus != domain.OCRStatusCompleted {
+				resultsChan <- imageResult{index: idx, rows: nil}
+				return
+			}
+
+			extraction, err := s.extractRepo.GetByReceiptImageID(ctx, img.ID)
+			if err != nil {
+				resultsChan <- imageResult{index: idx, err: err}
+				return
+			}
+			var review *domain.ReceiptReview
+			if s.reviewRepo != nil {
+				review, err = s.reviewRepo.GetByReceiptImageID(ctx, img.ID)
+				if err != nil {
+					resultsChan <- imageResult{index: idx, err: err}
+					return
+				}
+			}
 
 			fields := map[string]fieldValueForExport{}
 			if extraction != nil && len(extraction.FieldsJSON) > 0 {
@@ -93,11 +109,11 @@ func (s *groupExportService) CreateCSVExport(ctx context.Context, userID, groupI
 
 			var imageRows [][]string
 			for _, item := range items {
-				imageRows = append(imageRows, s.buildVatPurchaseRow(group, &image, extraction, fields, item, corrected))
+				imageRows = append(imageRows, s.buildVatPurchaseRow(group, &img, extraction, fields, item, corrected))
 			}
 			
-			resultsChan <- imageResult{index: index, rows: imageRows}
-		}(i, img)
+			resultsChan <- imageResult{index: idx, rows: imageRows}
+		}(i, image)
 	}
 
 	// Collect all results
@@ -113,6 +129,17 @@ func (s *groupExportService) CreateCSVExport(ctx context.Context, userID, groupI
 	exportID := uuid.New()
 	buf := &bytes.Buffer{}
 	writer := csv.NewWriter(buf)
+
+	// Write headers
+	headers := []string{
+		"VAT CATEGORY", "CALENDAR TYPE", "Types Of purchase", "TIN.", "Seller Name ",
+		"Date Of Purchase", "MRC Number", "Vat receipt number", "Description.",
+		"Unit of Measure ", "Quantity.", "Unit Price.", "Total value", "vat", "value After vat",
+		"", "", "",
+	}
+	if err := writer.Write(headers); err != nil {
+		return nil, err
+	}
 
 	// Write results to buffer in correct order
 	for _, imageRows := range allResults {
@@ -163,21 +190,16 @@ func (s *groupExportService) buildVatPurchaseRow(
 	item map[string]any,
 	corrected map[string]any,
 ) []string {
-	row := make([]string, 15)
+	row := make([]string, 18)
 
 	// 1. VAT CATEGORY (G=GOODS;S=SERVICES) - Always G
 	row[0] = "G"
 
-	// 2. CALENDAR TYPE (E=ETHIOPIAN;G=GREGORIAN)
-	row[1] = s.getCalendarType(fields, corrected)
+	// 2. CALENDAR TYPE (E=ETHIOPIAN;G=GREGORIAN) - Forced to G
+	row[1] = "G"
 
-	// 3. Types of purchase (1-6)
-	// 1 = Taxable-local Purchase of Capital Assets
-	// 6 = Tax Exempted
-	row[2] = "6" // Default to exempt
-	if s.isTaxable(fields, item, corrected) {
-		row[2] = "1"
-	}
+	// 3. Types of purchase (1-6) - Forced to 5
+	row[2] = "5"
 
 	// 4. TIN
 	row[3] = s.getFieldValue(fields, corrected, "tin", "merchant")
@@ -194,11 +216,12 @@ func (s *groupExportService) buildVatPurchaseRow(
 	// 8. Vat receipt number (FS NO)
 	row[7] = s.getFieldValue(fields, corrected, "fs_number", "transaction")
 
-	// 9. Description (Leave empty as requested)
-	row[8] = ""
+	// 9. Description
+	row[8] = fmt.Sprint(item["description"])
+	if row[8] == "<nil>" { row[8] = "" }
 
-	// 10. Unit of Measure (Leave empty as requested)
-	row[9] = ""
+	// 10. Unit of Measure - Forced to 7
+	row[9] = "7"
 
 	// 11. Quantity
 	row[10] = fmt.Sprint(item["quantity"])
@@ -215,7 +238,7 @@ func (s *groupExportService) buildVatPurchaseRow(
 	// 14. vat
 	taxAmount := item["tax_amount"]
 	if taxAmount == nil || fmt.Sprint(taxAmount) == "0" || fmt.Sprint(taxAmount) == "0.0" {
-		row[13] = "NOTAXBL"
+		row[13] = "0" // Changed from NOTAXBL to 0 as per template examples
 	} else {
 		row[13] = fmt.Sprint(taxAmount)
 	}
@@ -225,6 +248,11 @@ func (s *groupExportService) buildVatPurchaseRow(
 	ta := s.toFloat(item["tax_amount"])
 	row[14] = fmt.Sprintf("%.2f", lt+ta)
 	if row[14] == "0.00" && row[12] == "" { row[14] = "" }
+
+	// 16-18. Empty columns as per template
+	row[15] = ""
+	row[16] = ""
+	row[17] = ""
 
 	return row
 }

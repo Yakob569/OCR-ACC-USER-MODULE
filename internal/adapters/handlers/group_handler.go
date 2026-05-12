@@ -17,16 +17,17 @@ import (
 )
 
 type GroupHandler struct {
-	svc       ports.ReceiptGroupService
-	uploadSvc ports.ReceiptUploadService
-	querySvc  ports.ReceiptQueryService
-	reviewSvc ports.ReceiptReviewService
-	retrySvc  ports.OCRRetryService
-	exportSvc ports.GroupExportService
+	svc        ports.ReceiptGroupService
+	uploadSvc  ports.ReceiptUploadService
+	querySvc   ports.ReceiptQueryService
+	reviewSvc  ports.ReceiptReviewService
+	reviewRepo ports.ReceiptReviewRepository
+	retrySvc   ports.OCRRetryService
+	exportSvc  ports.GroupExportService
 }
 
-func NewGroupHandler(svc ports.ReceiptGroupService, uploadSvc ports.ReceiptUploadService, querySvc ports.ReceiptQueryService, reviewSvc ports.ReceiptReviewService, retrySvc ports.OCRRetryService, exportSvc ports.GroupExportService) *GroupHandler {
-	return &GroupHandler{svc: svc, uploadSvc: uploadSvc, querySvc: querySvc, reviewSvc: reviewSvc, retrySvc: retrySvc, exportSvc: exportSvc}
+func NewGroupHandler(svc ports.ReceiptGroupService, uploadSvc ports.ReceiptUploadService, querySvc ports.ReceiptQueryService, reviewSvc ports.ReceiptReviewService, reviewRepo ports.ReceiptReviewRepository, retrySvc ports.OCRRetryService, exportSvc ports.GroupExportService) *GroupHandler {
+	return &GroupHandler{svc: svc, uploadSvc: uploadSvc, querySvc: querySvc, reviewSvc: reviewSvc, reviewRepo: reviewRepo, retrySvc: retrySvc, exportSvc: exportSvc}
 }
 
 func (h *GroupHandler) CreateGroup(w http.ResponseWriter, r *http.Request) {
@@ -44,6 +45,7 @@ func (h *GroupHandler) CreateGroup(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: "Unauthorized"})
 		return
 	}
+	_ = userID // Ignore unused variable
 
 	var body CreateGroupRequest
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -88,6 +90,7 @@ func (h *GroupHandler) ListGroups(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: "Unauthorized"})
 		return
 	}
+	_ = userID // Ignore unused variable
 
 	limit := queryInt(r, "limit", 20)
 	offset := queryInt(r, "offset", 0)
@@ -123,6 +126,7 @@ func (h *GroupHandler) GetGroup(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: "Unauthorized"})
 		return
 	}
+	_ = userID // Ignore unused variable
 
 	groupID, err := groupIDFromPath(r.URL.Path)
 	if err != nil {
@@ -162,6 +166,7 @@ func (h *GroupHandler) UploadGroupImages(w http.ResponseWriter, r *http.Request)
 		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: "Unauthorized"})
 		return
 	}
+	_ = userID // Ignore unused variable
 
 	groupID, err := nestedGroupIDFromPath(r.URL.Path, "images")
 	if err != nil {
@@ -223,6 +228,7 @@ func (h *GroupHandler) ListGroupImages(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: "Unauthorized"})
 		return
 	}
+	_ = userID // Ignore unused variable
 
 	groupID, err := nestedGroupIDFromPath(r.URL.Path, "images")
 	if err != nil {
@@ -264,6 +270,7 @@ func (h *GroupHandler) ListGroupResults(w http.ResponseWriter, r *http.Request) 
 		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: "Unauthorized"})
 		return
 	}
+	_ = userID // Ignore unused variable
 
 	groupID, err := nestedGroupIDFromPath(r.URL.Path, "results")
 	if err != nil {
@@ -299,6 +306,7 @@ func (h *GroupHandler) GetImage(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: "Unauthorized"})
 		return
 	}
+	_ = userID // Ignore unused variable
 
 	imageID, err := imageIDFromPath(r.URL.Path)
 	if err != nil {
@@ -334,6 +342,7 @@ func (h *GroupHandler) GetImageResult(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: "Unauthorized"})
 		return
 	}
+	_ = userID // Ignore unused variable
 
 	imageID, err := nestedImageIDFromPath(r.URL.Path, "result")
 	if err != nil {
@@ -369,6 +378,7 @@ func (h *GroupHandler) SubmitImageReview(w http.ResponseWriter, r *http.Request)
 		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: "Unauthorized"})
 		return
 	}
+	_ = userID // Ignore unused variable
 
 	imageID, err := nestedImageIDFromPath(r.URL.Path, "review")
 	if err != nil {
@@ -405,6 +415,43 @@ func (h *GroupHandler) SubmitImageReview(w http.ResponseWriter, r *http.Request)
 	}{Status: true, Data: review})
 }
 
+func (h *GroupHandler) GetImageReview(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: "Only GET is allowed"})
+		return
+	}
+
+	userID, ok := requestUserID(r)
+	if !ok {
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: "Unauthorized"})
+		return
+	}
+	_ = userID // Ignore unused variable
+
+	imageID, err := nestedImageIDFromPath(r.URL.Path, "review")
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: "Invalid image ID"})
+		return
+	}
+
+	review, err := h.reviewRepo.GetByReceiptImageID(r.Context(), imageID)
+	if err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: "Review not found"})
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(struct {
+		Status bool                  `json:"status"`
+		Data   *domain.ReceiptReview `json:"data"`
+	}{Status: true, Data: review})
+}
+
 func (h *GroupHandler) RetryImage(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if r.Method != http.MethodPost {
@@ -419,6 +466,7 @@ func (h *GroupHandler) RetryImage(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: "Unauthorized"})
 		return
 	}
+	_ = userID // Ignore unused variable
 
 	imageID, err := nestedImageIDFromPath(r.URL.Path, "retry")
 	if err != nil {
@@ -455,6 +503,7 @@ func (h *GroupHandler) CreateCSVExport(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: "Unauthorized"})
 		return
 	}
+	_ = userID // Ignore unused variable
 
 	groupID, err := nestedGroupIDFromExportPath(r.URL.Path, "csv")
 	if err != nil {
@@ -498,6 +547,7 @@ func (h *GroupHandler) ListGroupExports(w http.ResponseWriter, r *http.Request) 
 		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: "Unauthorized"})
 		return
 	}
+	_ = userID // Ignore unused variable
 
 	groupID, err := nestedGroupIDFromPath(r.URL.Path, "exports")
 	if err != nil {

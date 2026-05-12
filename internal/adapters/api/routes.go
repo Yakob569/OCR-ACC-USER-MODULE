@@ -62,6 +62,10 @@ func (s *Server) RegisterRoutes() http.Handler {
 			return
 		}
 		if strings.HasSuffix(r.URL.Path, "/review") {
+			if r.Method == http.MethodGet {
+				s.groupHandler.GetImageReview(w, r)
+				return
+			}
 			s.groupHandler.SubmitImageReview(w, r)
 			return
 		}

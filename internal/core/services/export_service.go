@@ -81,8 +81,21 @@ func (s *groupExportService) CreateCSVExport(ctx context.Context, userID, groupI
 			}
 
 			fields := map[string]fieldValueForExport{}
+			var totals struct {
+				Subtotal  *float64 `json:"subtotal"`
+				TaxTotal  *float64 `json:"tax_total"`
+			}
+
 			if extraction != nil && len(extraction.FieldsJSON) > 0 {
 				_ = json.Unmarshal(extraction.FieldsJSON, &fields)
+				// Try to unmarshal totals from the same JSON
+				var rawFields map[string]any
+				if err := json.Unmarshal(extraction.FieldsJSON, &rawFields); err == nil {
+					if t, ok := rawFields["totals"].(map[string]any); ok {
+						if sub, ok := t["subtotal"].(map[string]any)["value"].(float64); ok { totals.Subtotal = &sub }
+						if tax, ok := t["tax_total"].(map[string]any)["value"].(float64); ok { totals.TaxTotal = &tax }
+					}
+				}
 			}
 
 			var items []map[string]any
@@ -94,9 +107,23 @@ func (s *groupExportService) CreateCSVExport(ctx context.Context, userID, groupI
 				items = []map[string]any{{}}
 			}
 
+			// Calculate sum of line totals for proportional VAT
+			var totalLineTotal float64
+			for _, item := range items {
+				totalLineTotal += s.toFloat(item["line_total"])
+			}
+
+			var corrected map[string]any
+			if s.reviewRepo != nil {
+				review, err := s.reviewRepo.GetByReceiptImageID(ctx, img.ID)
+				if err == nil && review != nil && len(review.CorrectedFieldsJSON) > 0 {
+					_ = json.Unmarshal(review.CorrectedFieldsJSON, &corrected)
+				}
+			}
+
 			var imageRows [][]string
 			for _, item := range items {
-				imageRows = append(imageRows, s.buildVatPurchaseRow(group, &img, extraction, fields, item))
+				imageRows = append(imageRows, s.buildVatPurchaseRow(group, &img, extraction, fields, totals.Subtotal, totals.TaxTotal, totalLineTotal, corrected, item))
 			}
 			
 			resultsChan <- imageResult{index: idx, rows: imageRows}
@@ -174,6 +201,10 @@ func (s *groupExportService) buildVatPurchaseRow(
 	image *domain.ReceiptImage,
 	extraction *domain.OCRExtraction,
 	fields map[string]fieldValueForExport,
+	subtotal *float64,
+	taxTotal *float64,
+	totalLineTotal float64,
+	corrected map[string]any,
 	item map[string]any,
 ) []string {
 	row := make([]string, 18)
@@ -184,8 +215,12 @@ func (s *groupExportService) buildVatPurchaseRow(
 	// 2. CALENDAR TYPE (E=ETHIOPIAN;G=GREGORIAN) - Forced to G
 	row[1] = "G"
 
-	// 3. Types of purchase (1-6) - Forced to 5
-	row[2] = "5"
+	// 3. Types of purchase (1-6) - Dynamic from review stage, default to 5
+	if val, ok := corrected["types_of_purchase"]; ok {
+		row[2] = fmt.Sprint(val)
+	} else {
+		row[2] = "5" // Default value
+	}
 
 	// 4. TIN
 	row[3] = s.getFieldValue(fields, "tin", "merchant")
@@ -210,11 +245,15 @@ func (s *groupExportService) buildVatPurchaseRow(
 	row[8] = fmt.Sprint(item["description"])
 	if row[8] == "<nil>" { row[8] = "" }
 
-	// 10. Unit of Measure - Use 7 or 9 based on content if possible, default to 7
-	row[9] = "7" 
-	desc := strings.ToLower(row[8])
-	if strings.Contains(desc, "transport") || strings.Contains(desc, "lime") || strings.Contains(desc, "dolomite") || strings.Contains(desc, "utility") || strings.Contains(desc, "marble") {
-		row[9] = "9"
+	// 10. Unit of Measure - From review stage, fallback to logic
+	if val, ok := corrected["unit_of_measurement"]; ok {
+		row[9] = fmt.Sprint(val)
+	} else {
+		row[9] = "7" 
+		desc := strings.ToLower(row[8])
+		if strings.Contains(desc, "transport") || strings.Contains(desc, "lime") || strings.Contains(desc, "dolomite") || strings.Contains(desc, "utility") || strings.Contains(desc, "marble") {
+			row[9] = "9"
+		}
 	}
 
 	// 11. Quantity
@@ -226,22 +265,22 @@ func (s *groupExportService) buildVatPurchaseRow(
 	if row[11] == "<nil>" { row[11] = "" }
 
 	// 13. Total value (Line Total)
-	row[12] = fmt.Sprint(item["line_total"])
-	if row[12] == "<nil>" { row[12] = "" }
-
-	// 14. vat
-	taxAmount := item["tax_amount"]
-	if taxAmount == nil || fmt.Sprint(taxAmount) == "0" || fmt.Sprint(taxAmount) == "0.0" {
-		row[13] = "0"
-	} else {
-		row[13] = fmt.Sprint(taxAmount)
-	}
-
-	// 15. value after vat (Line Total + Tax)
 	lt := s.toFloat(item["line_total"])
-	ta := s.toFloat(item["tax_amount"])
-	row[14] = fmt.Sprintf("%.2f", lt+ta)
-	if row[14] == "0.00" && row[12] == "" { row[14] = "" }
+	row[12] = fmt.Sprintf("%.2f", lt)
+	if row[12] == "0.00" { row[12] = "" }
+
+	// 14. VAT (Proportional distribution)
+	itemVAT := 0.0
+	if subtotal != nil && *subtotal > 0 && taxTotal != nil && totalLineTotal > 0 {
+		itemVAT = (lt / totalLineTotal) * (*taxTotal)
+	} else {
+		// Fallback to item-specific tax if total subtotal not available
+		itemVAT = s.toFloat(item["tax_amount"])
+	}
+	row[13] = fmt.Sprintf("%.2f", itemVAT)
+
+	// 15. Value after VAT
+	row[14] = fmt.Sprintf("%.2f", lt+itemVAT)
 
 	// 16-18. Empty columns as per template
 	row[15] = ""

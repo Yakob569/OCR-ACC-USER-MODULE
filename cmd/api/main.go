@@ -84,7 +84,7 @@ func main() {
 	exportSvc := services.NewGroupExportService(groupRepo, imageRepo, extractionRepo, reviewRepo, exportRepo, objectStorageSvc)
 	ocrJobSvc := services.NewOCRJobService(jobRepo, imageRepo, extractionRepo, groupRepo, objectStorageSvc, ocrEngineSvc, cfg.OCREngine.MaxConcurrency)
 	userHandler := handlers.NewUserHandler(userSvc)
-	groupHandler := handlers.NewGroupHandler(groupSvc, uploadSvc, querySvc, reviewSvc, retrySvc, exportSvc)
+	groupHandler := handlers.NewGroupHandler(groupSvc, uploadSvc, querySvc, reviewSvc, reviewRepo, retrySvc, exportSvc)
 	dashboardHandler := handlers.NewDashboardHandler(dashboardSvc)
 
 	// 3. Initialize Server

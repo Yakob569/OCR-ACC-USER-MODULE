@@ -81,21 +81,8 @@ func (s *groupExportService) CreateCSVExport(ctx context.Context, userID, groupI
 			}
 
 			fields := map[string]fieldValueForExport{}
-			var totals struct {
-				Subtotal  *float64 `json:"subtotal"`
-				TaxTotal  *float64 `json:"tax_total"`
-			}
-
 			if extraction != nil && len(extraction.FieldsJSON) > 0 {
 				_ = json.Unmarshal(extraction.FieldsJSON, &fields)
-				// Try to unmarshal totals from the same JSON
-				var rawFields map[string]any
-				if err := json.Unmarshal(extraction.FieldsJSON, &rawFields); err == nil {
-					if t, ok := rawFields["totals"].(map[string]any); ok {
-						if sub, ok := t["subtotal"].(map[string]any)["value"].(float64); ok { totals.Subtotal = &sub }
-						if tax, ok := t["tax_total"].(map[string]any)["value"].(float64); ok { totals.TaxTotal = &tax }
-					}
-				}
 			}
 
 			var items []map[string]any
@@ -107,10 +94,29 @@ func (s *groupExportService) CreateCSVExport(ctx context.Context, userID, groupI
 				items = []map[string]any{{}}
 			}
 
+			// Extract totals from FieldsJSON (flattens into fields map)
+			// We look for 'subtotal' and 'tax_total' (or 'vat')
+			subtotalVal := s.getFieldValue(fields, "subtotal", "")
+			if subtotalVal == "" {
+				subtotalVal = s.getFieldValue(fields, "taxable_amount", "")
+			}
+			taxTotalVal := s.getFieldValue(fields, "tax_total", "")
+			if taxTotalVal == "" {
+				taxTotalVal = s.getFieldValue(fields, "vat", "")
+			}
+
+			subtotal := s.toFloat(subtotalVal)
+			taxTotal := s.toFloat(taxTotalVal)
+
 			// Calculate sum of line totals for proportional VAT
 			var totalLineTotal float64
 			for _, item := range items {
 				totalLineTotal += s.toFloat(item["line_total"])
+			}
+
+			// If subtotal is missing but we have items, use totalLineTotal as subtotal
+			if subtotal == 0 {
+				subtotal = totalLineTotal
 			}
 
 			var corrected map[string]any
@@ -123,7 +129,7 @@ func (s *groupExportService) CreateCSVExport(ctx context.Context, userID, groupI
 
 			var imageRows [][]string
 			for _, item := range items {
-				imageRows = append(imageRows, s.buildVatPurchaseRow(group, &img, extraction, fields, totals.Subtotal, totals.TaxTotal, totalLineTotal, corrected, item))
+				imageRows = append(imageRows, s.buildVatPurchaseRow(group, &img, extraction, fields, subtotal, taxTotal, totalLineTotal, corrected, item))
 			}
 			
 			resultsChan <- imageResult{index: idx, rows: imageRows}
@@ -201,8 +207,8 @@ func (s *groupExportService) buildVatPurchaseRow(
 	image *domain.ReceiptImage,
 	extraction *domain.OCRExtraction,
 	fields map[string]fieldValueForExport,
-	subtotal *float64,
-	taxTotal *float64,
+	subtotal float64,
+	taxTotal float64,
 	totalLineTotal float64,
 	corrected map[string]any,
 	item map[string]any,
@@ -264,22 +270,23 @@ func (s *groupExportService) buildVatPurchaseRow(
 	row[11] = fmt.Sprint(item["unit_price"])
 	if row[11] == "<nil>" { row[11] = "" }
 
-	// 13. Total value (Line Total)
+	// 13. Total value (Line Total / Net Amount)
 	lt := s.toFloat(item["line_total"])
 	row[12] = fmt.Sprintf("%.2f", lt)
 	if row[12] == "0.00" { row[12] = "" }
 
 	// 14. VAT (Proportional distribution)
 	itemVAT := 0.0
-	if subtotal != nil && *subtotal > 0 && taxTotal != nil && totalLineTotal > 0 {
-		itemVAT = (lt / totalLineTotal) * (*taxTotal)
-	} else {
-		// Fallback to item-specific tax if total subtotal not available
+	if taxTotal > 0 && totalLineTotal > 0 {
+		// Proportional VAT = (Line Total / Total Items Sum) * Total VAT
+		itemVAT = (lt / totalLineTotal) * taxTotal
+	} else if lt > 0 && taxTotal == 0 {
+		// If total VAT is missing but item has tax amount, use it
 		itemVAT = s.toFloat(item["tax_amount"])
 	}
 	row[13] = fmt.Sprintf("%.2f", itemVAT)
 
-	// 15. Value after VAT
+	// 15. Value after VAT (Gross Amount)
 	row[14] = fmt.Sprintf("%.2f", lt+itemVAT)
 
 	// 16-18. Empty columns as per template
@@ -343,8 +350,33 @@ func (s *groupExportService) getFieldValue(fields map[string]fieldValueForExport
 }
 func (s *groupExportService) toFloat(v any) float64 {
 	if v == nil { return 0 }
+	
+	switch val := v.(type) {
+	case float64:
+		return val
+	case float32:
+		return float64(val)
+	case int:
+		return float64(val)
+	case int64:
+		return float64(val)
+	case string:
+		var f float64
+		// Remove currency symbols, spaces, and commas
+		clean := strings.ReplaceAll(val, ",", "")
+		clean = strings.TrimSpace(clean)
+		fmt.Sscanf(clean, "%f", &f)
+		return f
+	case map[string]any:
+		if v2, ok := val["value"]; ok {
+			return s.toFloat(v2)
+		}
+	}
+
+	// Final fallback
 	var f float64
 	str := fmt.Sprint(v)
+	str = strings.ReplaceAll(str, ",", "")
 	fmt.Sscanf(str, "%f", &f)
 	return f
 }

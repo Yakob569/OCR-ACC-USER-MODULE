@@ -215,8 +215,14 @@ func (s *groupExportService) buildVatPurchaseRow(
 ) []string {
 	row := make([]string, 18)
 
-	// 1. VAT CATEGORY (G=GOODS;S=SERVICES) - Always G
+	// 1. VAT CATEGORY (G=GOODS;S=SERVICES)
+	category, _ := item["category"].(string)
 	row[0] = "G"
+	if strings.ToLower(category) == "service" {
+		row[0] = "S"
+	} else if strings.ToLower(category) == "good" {
+		row[0] = "G"
+	}
 
 	// 2. CALENDAR TYPE (E=ETHIOPIAN;G=GREGORIAN) - Forced to G
 	row[1] = "G"

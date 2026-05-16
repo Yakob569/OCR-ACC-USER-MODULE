@@ -119,7 +119,7 @@ func (r *receiptGroupRepo) ListByUser(ctx context.Context, userID uuid.UUID, lim
 		SELECT id, user_id, name, description, status, total_images, queued_images, processing_images,
 		       completed_images, failed_images, reviewed_images, export_count, created_at, updated_at
 		FROM receipt_groups
-		WHERE user_id = $1
+		WHERE user_id = $1 AND deleted_at IS NULL
 		ORDER BY created_at DESC
 		LIMIT $2 OFFSET $3
 	`
@@ -165,13 +165,13 @@ func (r *receiptGroupRepo) ListByUser(ctx context.Context, userID uuid.UUID, lim
 func (r *receiptGroupRepo) GetByID(ctx context.Context, id uuid.UUID) (*domain.ReceiptGroup, error) {
 	return r.getOne(ctx, `SELECT id, user_id, name, description, status, total_images, queued_images, processing_images,
 		completed_images, failed_images, reviewed_images, export_count, created_at, updated_at
-		FROM receipt_groups WHERE id = $1`, id)
+		FROM receipt_groups WHERE id = $1 AND deleted_at IS NULL`, id)
 }
 
 func (r *receiptGroupRepo) GetByUserAndID(ctx context.Context, userID, id uuid.UUID) (*domain.ReceiptGroup, error) {
 	return r.getOne(ctx, `SELECT id, user_id, name, description, status, total_images, queued_images, processing_images,
 		completed_images, failed_images, reviewed_images, export_count, created_at, updated_at
-		FROM receipt_groups WHERE user_id = $1 AND id = $2`, userID, id)
+		FROM receipt_groups WHERE user_id = $1 AND id = $2 AND deleted_at IS NULL`, userID, id)
 }
 
 func (r *receiptGroupRepo) getOne(ctx context.Context, query string, args ...any) (*domain.ReceiptGroup, error) {
@@ -466,13 +466,14 @@ func (r *receiptImageRepo) ListByGroup(ctx context.Context, userID, groupID uuid
 	}
 
 	query := `
-		SELECT id, group_id, user_id, original_filename, mime_type, file_size_bytes, checksum_sha256,
-		       storage_bucket, storage_object_key, storage_url, upload_status, ocr_status, review_status,
-		       ocr_attempt_count, last_error_code, last_error_message, receipt_type, overall_confidence,
-		       processed_at, created_at, updated_at
-		FROM receipt_images
-		WHERE user_id = $1 AND group_id = $2
-		ORDER BY created_at DESC
+		SELECT ri.id, ri.group_id, ri.user_id, ri.original_filename, ri.mime_type, ri.file_size_bytes, ri.checksum_sha256,
+		       ri.storage_bucket, ri.storage_object_key, ri.storage_url, ri.upload_status, ri.ocr_status, ri.review_status,
+		       ri.ocr_attempt_count, ri.last_error_code, ri.last_error_message, ri.receipt_type, ri.overall_confidence,
+		       ri.processed_at, ri.created_at, ri.updated_at
+		FROM receipt_images ri
+		JOIN receipt_groups rg ON ri.group_id = rg.id
+		WHERE ri.user_id = $1 AND ri.group_id = $2 AND rg.deleted_at IS NULL
+		ORDER BY ri.created_at DESC
 		LIMIT $3 OFFSET $4
 	`
 
@@ -1107,7 +1108,7 @@ func (r *dashboardRepo) GetSummary(ctx context.Context, userID uuid.UUID) (*doma
 
 	if err := r.db.QueryRow(ctx, `
 		SELECT
-			(SELECT COUNT(*) FROM receipt_groups WHERE user_id = $1),
+			(SELECT COUNT(*) FROM receipt_groups WHERE user_id = $1 AND deleted_at IS NULL),
 			(SELECT COUNT(*) FROM receipt_images WHERE user_id = $1),
 			(SELECT COUNT(*) FROM receipt_images WHERE user_id = $1 AND ocr_status = $2),
 			(SELECT COUNT(*) FROM receipt_images WHERE user_id = $1 AND ocr_status = $3),
@@ -1143,7 +1144,7 @@ func (r *dashboardRepo) GetSummary(ctx context.Context, userID uuid.UUID) (*doma
 		SELECT id, user_id, name, description, status, total_images, queued_images, processing_images,
 		       completed_images, failed_images, reviewed_images, export_count, created_at, updated_at
 		FROM receipt_groups
-		WHERE user_id = $1
+		WHERE user_id = $1 AND deleted_at IS NULL
 		ORDER BY created_at DESC
 		LIMIT 5
 	`, userID)

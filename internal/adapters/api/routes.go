@@ -54,6 +54,10 @@ func (s *Server) RegisterRoutes() http.Handler {
 			s.groupHandler.ListGroupExports(w, r)
 			return
 		}
+		if r.Method == http.MethodDelete {
+			s.groupHandler.DeleteGroup(w, r)
+			return
+		}
 		s.groupHandler.GetGroup(w, r)
 	})
 	protectedMux.HandleFunc("/api/v1/images/", func(w http.ResponseWriter, r *http.Request) {
@@ -71,6 +75,10 @@ func (s *Server) RegisterRoutes() http.Handler {
 		}
 		if strings.HasSuffix(r.URL.Path, "/retry") {
 			s.groupHandler.RetryImage(w, r)
+			return
+		}
+		if r.Method == http.MethodDelete {
+			s.groupHandler.DeleteImage(w, r)
 			return
 		}
 		s.groupHandler.GetImage(w, r)

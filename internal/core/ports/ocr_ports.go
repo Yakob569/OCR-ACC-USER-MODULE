@@ -15,6 +15,7 @@ type ReceiptGroupRepository interface {
 	GetByID(ctx context.Context, id uuid.UUID) (*domain.ReceiptGroup, error)
 	GetByUserAndID(ctx context.Context, userID, id uuid.UUID) (*domain.ReceiptGroup, error)
 	UpdateStatus(ctx context.Context, id uuid.UUID, status string) error
+	SoftDelete(ctx context.Context, id uuid.UUID) error
 	IncrementImageCounters(ctx context.Context, id uuid.UUID, total, queued, processing, completed, failed, reviewed, exports int) error
 	RefreshAggregateState(ctx context.Context, id uuid.UUID) (*domain.ReceiptGroup, error)
 }
@@ -26,6 +27,7 @@ type ReceiptImageRepository interface {
 	GetByUserAndID(ctx context.Context, userID, id uuid.UUID) (*domain.ReceiptImage, error)
 	UpdateStatuses(ctx context.Context, id uuid.UUID, uploadStatus, ocrStatus, reviewStatus string) error
 	UpdateProcessingResult(ctx context.Context, id uuid.UUID, status string, receiptType *string, confidence *float64, errorCode, errorMessage *string) error
+	TrashImage(ctx context.Context, imageID uuid.UUID) error
 }
 
 type OCRExtractionRepository interface {
@@ -57,6 +59,7 @@ type ReceiptGroupService interface {
 	CreateGroup(ctx context.Context, input domain.CreateReceiptGroupInput) (*domain.ReceiptGroup, error)
 	ListGroups(ctx context.Context, userID uuid.UUID, limit, offset int) ([]domain.ReceiptGroup, error)
 	GetGroup(ctx context.Context, userID, groupID uuid.UUID) (*domain.ReceiptGroup, error)
+	DeleteGroup(ctx context.Context, userID, groupID uuid.UUID) error
 }
 
 type ReceiptUploadService interface {
@@ -79,6 +82,7 @@ type DashboardRepository interface {
 type ReceiptQueryService interface {
 	ListGroupImages(ctx context.Context, userID, groupID uuid.UUID, limit, offset int) ([]domain.ReceiptImage, error)
 	GetImage(ctx context.Context, userID, imageID uuid.UUID) (*domain.ReceiptImage, error)
+	DeleteImage(ctx context.Context, userID, imageID uuid.UUID) error
 	GetImageResult(ctx context.Context, userID, imageID uuid.UUID) (*domain.OCRExtraction, error)
 	ListGroupResults(ctx context.Context, userID, groupID uuid.UUID, limit, offset int) ([]domain.OCRExtraction, error)
 }

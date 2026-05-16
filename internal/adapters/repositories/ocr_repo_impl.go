@@ -217,6 +217,65 @@ func (r *receiptGroupRepo) UpdateStatus(ctx context.Context, id uuid.UUID, statu
 	return err
 }
 
+func (r *receiptGroupRepo) SoftDelete(ctx context.Context, id uuid.UUID) error {
+	if r.db == nil {
+		return errors.New("database connection is not available")
+	}
+
+	_, err := r.db.Exec(ctx, `UPDATE receipt_groups SET deleted_at = NOW() WHERE id = $1`, id)
+	return err
+}
+
+func (r *receiptImageRepo) TrashImage(ctx context.Context, imageID uuid.UUID) error {
+	if r.db == nil {
+		return errors.New("database connection is not available")
+	}
+
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	// Select image to trash
+	querySelect := `
+		SELECT id, group_id, user_id, original_filename, mime_type, file_size_bytes, checksum_sha256,
+		       storage_bucket, storage_object_key, storage_url, upload_status, ocr_status, review_status,
+		       ocr_attempt_count, last_error_code, last_error_message, receipt_type, overall_confidence,
+		       processed_at, created_at, updated_at
+		FROM receipt_images WHERE id = $1
+	`
+	row := tx.QueryRow(ctx, querySelect, imageID)
+	img, err := scanReceiptImage(row)
+	if err != nil {
+		return err
+	}
+
+	// Insert into trash
+	queryInsert := `
+		INSERT INTO receipt_images_trash (
+			id, group_id, original_filename, storage_url, ocr_status, review_status,
+			ocr_attempt_count, overall_confidence, last_error_message, created_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+	`
+	_, err = tx.Exec(ctx, queryInsert,
+		img.ID, img.GroupID, img.OriginalFilename, img.StorageURL, img.OCRStatus, img.ReviewStatus,
+		img.OCRAttemptCount, img.OverallConfidence, img.LastErrorMessage, img.CreatedAt,
+	)
+	if err != nil {
+		return err
+	}
+
+	// Delete from original
+	_, err = tx.Exec(ctx, `DELETE FROM receipt_images WHERE id = $1`, imageID)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit(ctx)
+}
+
+
 func (r *receiptGroupRepo) IncrementImageCounters(ctx context.Context, id uuid.UUID, total, queued, processing, completed, failed, reviewed, exports int) error {
 	if r.db == nil {
 		return errors.New("database connection is not available")

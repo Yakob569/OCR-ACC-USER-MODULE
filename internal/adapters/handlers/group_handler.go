@@ -292,6 +292,73 @@ func (h *GroupHandler) ListGroupResults(w http.ResponseWriter, r *http.Request) 
 	}{Status: true, Data: results})
 }
 
+func (h *GroupHandler) DeleteGroup(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if r.Method != http.MethodDelete {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: "Only DELETE is allowed"})
+		return
+	}
+
+	userID, ok := requestUserID(r)
+	if !ok {
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: "Unauthorized"})
+		return
+	}
+
+	groupID, err := groupIDFromPath(r.URL.Path)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: "Invalid group ID"})
+		return
+	}
+
+	if err := h.svc.DeleteGroup(r.Context(), userID, groupID); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: err.Error()})
+		return
+	}
+
+	json.NewEncoder(w).Encode(struct {
+		Status bool   `json:"status"`
+	}{Status: true})
+}
+
+func (h *GroupHandler) DeleteImage(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if r.Method != http.MethodDelete {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: "Only DELETE is allowed"})
+		return
+	}
+
+	userID, ok := requestUserID(r)
+	if !ok {
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: "Unauthorized"})
+		return
+	}
+
+	imageID, err := imageIDFromPath(r.URL.Path)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: "Invalid image ID"})
+		return
+	}
+
+	if err := h.querySvc.DeleteImage(r.Context(), userID, imageID); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(ErrorResponse{Status: false, Error: err.Error()})
+		return
+	}
+
+	json.NewEncoder(w).Encode(struct {
+		Status bool   `json:"status"`
+	}{Status: true})
+}
+
+
 func (h *GroupHandler) GetImage(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if r.Method != http.MethodGet {

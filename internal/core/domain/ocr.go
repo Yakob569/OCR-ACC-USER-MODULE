@@ -52,6 +52,7 @@ type ReceiptGroup struct {
 	FailedImages     int       `json:"failed_images"`
 	ReviewedImages   int       `json:"reviewed_images"`
 	ExportCount      int       `json:"export_count"`
+	DeletedAt        *time.Time `json:"deleted_at"`
 	CreatedAt        time.Time `json:"created_at"`
 	UpdatedAt        time.Time `json:"updated_at"`
 }

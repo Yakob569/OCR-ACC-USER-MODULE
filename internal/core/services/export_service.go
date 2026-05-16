@@ -251,7 +251,8 @@ func (s *groupExportService) buildVatPurchaseRow(
 	if fsNo == "" {
 		fsNo = s.getFieldValue(fields, "invoice_number", "transaction")
 	}
-	row[7] = fsNo
+	// Prepend "FS" and wrap with an apostrophe for Excel compatibility
+	row[7] = "'" + "FS" + fsNo
 
 	// 9. Description
 	row[8] = fmt.Sprint(item["description"])

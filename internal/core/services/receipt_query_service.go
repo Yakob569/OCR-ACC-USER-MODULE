@@ -44,6 +44,14 @@ func (s *receiptQueryService) GetImage(ctx context.Context, userID, imageID uuid
 	return s.imageRepo.GetByUserAndID(ctx, userID, imageID)
 }
 
+func (s *receiptQueryService) DeleteImage(ctx context.Context, userID, imageID uuid.UUID) error {
+	if _, err := s.imageRepo.GetByUserAndID(ctx, userID, imageID); err != nil {
+		return err
+	}
+	return s.imageRepo.TrashImage(ctx, imageID)
+}
+
+
 func (s *receiptQueryService) GetImageResult(ctx context.Context, userID, imageID uuid.UUID) (*domain.OCRExtraction, error) {
 	if _, err := s.imageRepo.GetByUserAndID(ctx, userID, imageID); err != nil {
 		return nil, err

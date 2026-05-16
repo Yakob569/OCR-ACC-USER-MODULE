@@ -55,3 +55,21 @@ func (s *receiptGroupService) GetGroup(ctx context.Context, userID, groupID uuid
 
 	return s.repo.GetByUserAndID(ctx, userID, groupID)
 }
+
+func (s *receiptGroupService) DeleteGroup(ctx context.Context, userID, groupID uuid.UUID) error {
+	if userID == uuid.Nil {
+		return fmt.Errorf("user ID is required")
+	}
+	if groupID == uuid.Nil {
+		return fmt.Errorf("group ID is required")
+	}
+
+	// Verify existence and ownership
+	_, err := s.repo.GetByUserAndID(ctx, userID, groupID)
+	if err != nil {
+		return err
+	}
+
+	return s.repo.SoftDelete(ctx, groupID)
+}
+
